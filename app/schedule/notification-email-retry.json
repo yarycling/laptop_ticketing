@@ -1,0 +1,20 @@
+{
+  "settings": {
+    "options": {
+      "rule": "0 */5 * * * *"
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "process_due_notification_emails",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "notification_email_process_due",
+          "params": {}
+        }
+      }
+    ]
+  }
+}

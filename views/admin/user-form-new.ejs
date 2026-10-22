@@ -1,0 +1,113 @@
+<!-- Wappler include head-page="layouts/main" bootstrap5="local" is="dmx-app" appConnect="local" components="{dmxBootstrap5Modal:{}}" -->
+<meta name="ac:route" content="/admin/users/<%= editing ? 'edit' : 'new' %>">
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="userDetail" url="/api/admin/users/detail" <%- editing ? '' : 'noload="true"' %> dmx-param:user_id="query.user_id"></dmx-serverconnect>
+  <dmx-serverconnect id="formOptions" url="/api/admin/users/form-options"></dmx-serverconnect>
+  <dmx-serverconnect id="schoolOptions" url="/api/admin/users/form-options" dmx-param:district_ids="userForm.schoolDistricts.value"></dmx-serverconnect>
+  <dmx-value id="narrowScope" dmx-bind:value="!userForm.securityGroups.value.contains('SUPER_ADMIN') && !userForm.securityGroups.value.contains('MOE_HEAD_OFFICE') && !userForm.securityGroups.value.contains('TSTT_OVERSIGHT')"></dmx-value>
+  <dmx-value id="needsDistrict" dmx-bind:value="narrowScope.value && userForm.securityGroups.value.contains('ICT_DISTRICT_COORDINATOR')"></dmx-value>
+  <dmx-value id="needsSchool" dmx-bind:value="narrowScope.value && (userForm.securityGroups.value.contains('SCHOOL_ADMINISTRATOR') || userForm.securityGroups.value.contains('ICT_TECHNICAL_OFFICER'))"></dmx-value>
+  <dmx-value id="needsLocation" dmx-bind:value="!userForm.securityGroups.value.contains('SUPER_ADMIN') && userForm.securityGroups.value.contains('REPAIR_CENTRE')"></dmx-value>
+<dmx-value id="districtMenuOpen" value=""></dmx-value>
+  <%- await include("../partials/portal-sidebar", { currentPage: "users" }) %>
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "User Administration" }) %>
+    <main class="portal-main user-form-page" aria-label="User Administration">
+      <nav class="user-form-breadcrumb" aria-label="Breadcrumb">
+        <a href="/admin/organisation">Administration</a><i class="fas fa-chevron-right" aria-hidden="true"></i>
+        <a href="/admin/users">Users</a><i class="fas fa-chevron-right" aria-hidden="true"></i>
+        <strong aria-current="page"><%= editing ? 'Edit User' : 'Add User' %></strong>
+      </nav>
+      <header class="user-form-heading">
+        <h1><%= editing ? 'Edit User' : 'Add User' %></h1>
+        <p><%= editing ? 'Update this user’s details, security groups and access scope.' : 'Create a new user and assign the security groups and access scope. The user will receive an email to set their password securely.' %></p>
+      </header>
+
+      <div role="status" class="alert alert-success user-form-result" dmx-show="userForm.data.success"><i class="fas fa-check-circle" aria-hidden="true"></i><span dmx-text="userForm.data.message"></span> <a dmx-bind:href="'/admin/users/detail?user_id=' + userForm.data.user_id">View user</a></div>
+      <div role="alert" class="alert alert-danger user-form-result" dmx-show="userForm.lastError.status" dmx-text="userForm.lastError.response.error || 'Could not save this user. Check all fields and try again.'"></div>
+      <% if (editing) { %><p class="user-form-loading" role="status" dmx-show="userDetail.state.executing">Loading user…</p><div class="alert alert-danger" dmx-show="userDetail.lastError.status">User could not be loaded.</div><% } %>
+
+      <form id="userForm" is="dmx-serverconnect-form" method="post" action="/api/admin/users/<%= editing ? 'update' : 'create' %>" <%- editing ? 'dmx-on:success="editDeactivateModal.hide();userDetail.load()"' : '' %>>
+        <% if (editing) { %><input type="hidden" name="user_id" dmx-bind:value="query.user_id"><input type="hidden" name="auth_version" dmx-bind:value="userDetail.data.user.auth_version"><% } %>
+
+        <section class="user-form-section" aria-labelledby="basicInfoHeading">
+          <header class="user-form-section-heading">
+            <span class="user-form-section-icon user-form-icon-green"><i class="fas fa-user" aria-hidden="true"></i></span>
+            <div><h2 id="basicInfoHeading">Basic Information</h2><p>Enter the user’s basic details. The username will be permanent once the user is created.</p></div>
+          </header>
+          <div class="user-basic-grid">
+            <div class="user-form-field"><label for="fullName" class="form-label">Full Name <span class="required-mark">*</span></label><div class="user-form-control-wrap"><i class="far fa-user" aria-hidden="true"></i><input id="fullName" name="full_name" class="form-control" placeholder="Enter full name (e.g. John Smith)" maxlength="220" required dmx-bind:value="userDetail.data.user.display_name"></div></div>
+            <div class="user-form-field"><label for="username" class="form-label">Username <span class="required-mark">*</span></label><div class="user-form-control-wrap"><i class="fas fa-at" aria-hidden="true"></i><input id="username" name="username" class="form-control" placeholder="Enter username (e.g. jsmith)" maxlength="150" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]*" required <%= editing ? 'readonly' : '' %> dmx-bind:value="userDetail.data.user.username"></div><small class="user-field-hint">Username is permanent after creation.</small></div>
+            <div class="user-form-field"><label for="email" class="form-label">Email <span class="required-mark">*</span></label><div class="user-form-control-wrap"><i class="far fa-envelope" aria-hidden="true"></i><input id="email" name="email" type="email" class="form-control" placeholder="Enter email address (e.g. john.smith@education.gov.tt)" maxlength="254" required dmx-bind:value="userDetail.data.user.email"></div></div>
+            <div class="user-form-field"><label for="status" class="form-label">Status <span class="required-mark">*</span></label><div class="user-form-control-wrap user-status-control"><span class="user-status-dot" dmx-class:user-status-dot-inactive="status.value == 'disabled'" aria-hidden="true"></span><select id="status" name="status" class="form-select" dmx-bind:value="userDetail.data.user.status || 'active'"><option value="active">Active</option><option value="disabled">Inactive</option><% if (editing) { %><option value="locked" disabled>Locked — choose Active or Inactive to change</option><% } %></select></div></div>
+          </div>
+        </section>
+
+        <section class="user-form-section" aria-labelledby="securityGroupsHeading">
+          <header class="user-form-section-heading user-form-section-heading-split">
+            <div class="user-form-section-title"><span class="user-form-section-icon user-form-icon-green"><i class="fas fa-users" aria-hidden="true"></i></span><div><h2 id="securityGroupsHeading">Security Groups</h2><p>Select one or more security groups to define what this user can access.</p></div></div>
+            <label class="user-group-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search security groups</span><input id="groupSearch" type="search" placeholder="Search security groups…" autocomplete="off"></label>
+          </header>
+          <div id="securityGroups" is="dmx-checkbox-group" class="user-group-grid" dmx-bind:value="userDetail.data.role_codes" dmx-on:change="districts.setValue([]);schools.setValue([]);schoolDistricts.setValue([]);locations.setValue([])">
+            <article class="user-group-choice" dmx-repeat:group="formOptions.data.roles" dmx-show="groupSearch.value == '' || label.lowercase().contains(groupSearch.value.lowercase()) || description.lowercase().contains(groupSearch.value.lowercase())">
+              <input class="user-group-checkbox" type="checkbox" name="role_codes[]" dmx-bind:id="'securityGroup-' + id" dmx-bind:value="name">
+              <label class="user-group-label" dmx-bind:for="'securityGroup-' + id"><span class="user-group-checkmark"><i class="fas fa-check" aria-hidden="true"></i></span><span class="user-group-copy"><strong dmx-text="label"></strong><small dmx-text="description"></small></span></label>
+            </article>
+          </div>
+          <p class="user-group-footnote">Permissions and access scope combine across selected groups.</p>
+        </section>
+
+        <section class="user-form-section" aria-labelledby="accessScopeHeading">
+          <header class="user-form-section-heading">
+            <span class="user-form-section-icon user-form-icon-green"><i class="fas fa-map-marker-alt" aria-hidden="true"></i></span>
+            <div><h2 id="accessScopeHeading">Access Scope</h2><p>Scope is determined by the selected security groups. Assign the specific locations this user can access.</p></div>
+          </header>
+          <div class="user-scope-summary-grid">
+            <article class="user-scope-summary-card" dmx-class:is-selected="userForm.securityGroups.value.contains('SUPER_ADMIN')"><i class="fas fa-globe" aria-hidden="true"></i><span><strong>Global</strong><small>Access to all locations</small></span></article>
+            <article class="user-scope-summary-card" dmx-class:is-selected="userForm.securityGroups.value.contains('MOE_HEAD_OFFICE') || userForm.securityGroups.value.contains('TSTT_OVERSIGHT')"><i class="fas fa-globe-americas" aria-hidden="true"></i><span><strong>National</strong><small>All regions nationwide</small></span></article>
+            <article class="user-scope-summary-card" dmx-class:is-selected="needsDistrict.value"><i class="fas fa-map-marked-alt" aria-hidden="true"></i><span><strong>District</strong><small>Specific district or region</small></span></article>
+            <article class="user-scope-summary-card" dmx-class:is-selected="needsSchool.value"><i class="fas fa-school" aria-hidden="true"></i><span><strong>School</strong><small>Specific school or schools</small></span></article>
+            <article class="user-scope-summary-card" dmx-class:is-selected="needsLocation.value"><i class="fas fa-wrench" aria-hidden="true"></i><span><strong>Repair Centre</strong><small>Specific repair centre</small></span></article>
+          </div>
+          <div class="user-scope-assignment-grid">
+            <div class="user-form-field" dmx-show="needsDistrict.value">
+              <label class="form-label" id="districtScopeLabel">District scope <span class="required-mark">*</span></label>
+              <div class="user-district-picker">
+                <div class="user-district-control" aria-labelledby="districtScopeLabel">
+                  <div class="user-district-chips">
+                    <span class="user-district-chip-wrap" dmx-repeat:selectedDistrict="formOptions.data.districts" dmx-show="districts.value.contains(id.toString())"><label class="user-district-chip" dmx-bind:for="'districtOption-' + id"><span dmx-text="name"></span><i class="fas fa-times" aria-hidden="true"></i></label></span>
+                    <span class="user-district-placeholder" dmx-show="districts.value.count() == 0">Select districts…</span>
+                  </div>
+                  <button class="user-district-toggle" type="button" dmx-bind:aria-expanded="districtMenuOpen.value" dmx-on:click="districtMenuOpen.setValue(!districtMenuOpen.value)" aria-controls="districtMenu" aria-label="Choose districts"><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                </div>
+                <div id="districtMenu" class="user-district-menu" role="group" aria-labelledby="districtScopeLabel" dmx-show="districtMenuOpen.value">
+                  <label class="user-district-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search districts</span><input id="districtSearch" type="search" placeholder="Search districts…" autocomplete="off"></label>
+                  <div id="districts" is="dmx-checkbox-group" class="user-district-options" role="group" aria-label="District options" dmx-bind:value="userDetail.data.district_ids">
+                    <div class="user-district-option" dmx-repeat:district="formOptions.data.districts" dmx-show="districts.value.contains(id.toString()) || districtSearch.value == '' || name.lowercase().contains(districtSearch.value.lowercase())">
+                      <input class="user-district-checkbox" type="checkbox" name="district_ids[]" dmx-bind:id="'districtOption-' + id" dmx-bind:value="id" dmx-bind:disabled="!needsDistrict.value">
+                      <label class="user-district-option-label" dmx-bind:for="'districtOption-' + id"><span class="user-district-check"><i class="fas fa-check" aria-hidden="true"></i></span><span dmx-text="name"></span></label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <small class="user-field-hint user-district-required-hint" role="status" dmx-show="needsDistrict.value && districts.value.count() == 0">Choose at least one district for this user.</small>
+              <small class="user-field-hint">Click to choose districts; click a selected tag to remove it.</small>
+            </div>
+            <div class="user-form-field" dmx-show="needsSchool.value"><label for="schoolDistricts" class="form-label">School districts (filter) <span class="required-mark">*</span></label><select multiple id="schoolDistricts" name="school_district_ids[]" class="form-select user-scope-select" dmx-bind:disabled="!needsSchool.value" dmx-bind:required="needsSchool.value" dmx-bind:value="userDetail.data.school_district_ids" dmx-bind:options="formOptions.data.districts" optiontext="name" optionvalue="id" dmx-on:change="schools.setValue([])"></select><small class="user-field-hint">Choose districts to load their active schools.</small></div>
+            <div class="user-form-field" dmx-show="needsSchool.value"><label for="schools" class="form-label">School scope <span class="required-mark">*</span></label><select multiple id="schools" name="school_ids[]" class="form-select user-scope-select" dmx-bind:disabled="!needsSchool.value" dmx-bind:required="needsSchool.value" dmx-bind:value="userDetail.data.school_ids" dmx-bind:options="schoolOptions.data.schools" optiontext="name" optionvalue="id"></select><small class="user-field-hint" dmx-show="!schoolOptions.data.schools.count()">No active schools in the selected districts.</small></div>
+            <div class="user-form-field" dmx-show="needsLocation.value"><label for="locations" class="form-label">Repair Centre / Service Location <span class="required-mark">*</span></label><select multiple id="locations" name="service_location_ids[]" class="form-select user-scope-select" dmx-bind:disabled="!needsLocation.value" dmx-bind:required="needsLocation.value" dmx-bind:value="userDetail.data.service_location_ids" dmx-bind:options="formOptions.data.locations" optiontext="name" optionvalue="id"></select><small class="user-field-hint" dmx-show="!formOptions.data.locations.count()">Create active repair locations in Logistics Locations first.</small></div>
+          </div>
+          <div class="user-scope-note" dmx-show="userForm.securityGroups.value.contains('SUPER_ADMIN')"><i class="fas fa-info-circle" aria-hidden="true"></i><span>Super Administrators have global access and do not require artificial scope assignments.</span></div>
+          <div class="user-scope-note" dmx-show="!userForm.securityGroups.value.contains('SUPER_ADMIN') && (userForm.securityGroups.value.contains('MOE_HEAD_OFFICE') || userForm.securityGroups.value.contains('TSTT_OVERSIGHT'))"><i class="fas fa-info-circle" aria-hidden="true"></i><span>A national scope assignment will be recorded for this user.</span></div>
+          <div class="user-scope-note" dmx-show="userForm.securityGroups.value.contains('TTPOST_LOGISTICS')"><i class="fas fa-info-circle" aria-hidden="true"></i><span>TTPost Logistics access is limited to logistics workflows and does not grant general school or district scope.</span></div>
+        </section>
+
+        <% if (!editing) { %><div class="user-setup-notice"><i class="fas fa-info-circle" aria-hidden="true"></i><span><strong>The user will receive a setup email</strong><small>A secure email will be sent with instructions to create their password and access the Laptop Warranty Management Portal.</small></span></div><% } %>
+        <div class="user-form-actions"><a href="/admin/users" class="btn btn-bmobile-secondary">Cancel</a><button type="<%= editing ? 'submit' : 'button' %>" class="btn btn-bmobile-primary user-submit-button" <%- editing ? 'dmx-show="status.value != &quot;disabled&quot; || userDetail.data.user.status != &quot;active"' : 'dmx-on:click="createUserConfirmModal.show()"' %> dmx-bind:disabled="userForm.state.executing <%= editing ? '|| !userDetail.data.user.id' : '|| userForm.data.success' %> || userForm.securityGroups.value.count() == 0 || (needsDistrict.value && districts.value.count() == 0)"><i class="fas <%= editing ? 'fa-save' : 'fa-paper-plane' %>" aria-hidden="true"></i><span><%= editing ? 'Save Changes' : 'Create User & Send Setup Email' %></span></button><% if (editing) { %><button type="button" class="btn btn-outline-danger" dmx-show="status.value == 'disabled' && userDetail.data.user.status == 'active'" dmx-on:click="editDeactivateModal.show()">Save &amp; Deactivate</button><% } %></div>
+<% if (!editing) { %><div id="createUserConfirmModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="createUserConfirmTitle" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false"><div class="modal-dialog modal-dialog-centered"><div class="modal-content portal-modal"><div class="modal-header"><div class="d-flex align-items-center gap-3"><span class="user-form-section-icon user-form-icon-green"><i class="fas" dmx-class:fa-user-plus="!userForm.data.success" dmx-class:fa-check-circle="userForm.data.success" aria-hidden="true"></i></span><div><h2 id="createUserConfirmTitle" class="h5 modal-title mb-1" dmx-text="userForm.data.success ? 'User created' : 'Create this user?'">Create this user?</h2><p class="small text-muted mb-0" dmx-text="userForm.data.success ? 'Account setup is complete.' : 'Review the account and setup email details.'">Review the account and setup email details.</p></div></div><button class="btn-close" type="button" aria-label="Close" dmx-show="!userForm.data.success" dmx-on:click="createUserConfirmModal.hide()"></button><a href="/admin/users" class="btn-close" aria-label="Close and return to all users" dmx-show="userForm.data.success"></a></div><div class="modal-body"><div class="alert alert-danger" role="alert" dmx-show="userForm.lastError.status" dmx-text="userForm.lastError.response.error || 'The user could not be created. Check the details and try again.'"></div><div dmx-show="!userForm.data.success"><p class="mb-2">This will create the portal account and send a secure setup email to:</p><dl class="row mb-3"><dt class="col-sm-4">Full name</dt><dd class="col-sm-8" dmx-text="userForm.fullName.value"></dd><dt class="col-sm-4">Username</dt><dd class="col-sm-8" dmx-text="userForm.username.value"></dd><dt class="col-sm-4">Email</dt><dd class="col-sm-8" dmx-text="userForm.email.value"></dd></dl><div class="user-scope-note mb-0"><i class="fas fa-shield-alt" aria-hidden="true"></i><span>The user will receive a one-time setup link to choose a password.</span></div></div><div class="user-create-success" role="status" dmx-show="userForm.data.success"><span class="user-form-section-icon user-form-icon-green"><i class="fas fa-check" aria-hidden="true"></i></span><p class="mb-2 fw-semibold" dmx-text="userForm.data.message"></p><p class="mb-0 text-muted">Account: <strong dmx-text="userForm.username.value"></strong> · <span dmx-text="userForm.email.value"></span></p></div></div><div class="modal-footer"><div dmx-show="!userForm.data.success" class="d-flex gap-2"><button type="button" class="btn btn-bmobile-secondary" dmx-on:click="createUserConfirmModal.hide()">Cancel</button><button type="submit" class="btn btn-bmobile-primary" dmx-bind:disabled="userForm.state.executing || userForm.securityGroups.value.count() == 0 || (needsDistrict.value && districts.value.count() == 0)"><i class="fas fa-paper-plane me-2" aria-hidden="true"></i><span dmx-text="userForm.state.executing ? 'Creating user…' : 'Confirm & Send Setup Email'"></span></button></div><a href="/admin/users" class="btn btn-bmobile-primary" dmx-show="userForm.data.success">OK</a></div></div></div></div><% } %>
+      </form>
+    </main>
+  </div>
+</div>
+<% if (editing) { %><div id="editDeactivateModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="editDeactivateTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content portal-modal"><div class="modal-header"><h2 id="editDeactivateTitle" class="h5 modal-title">Deactivate this user?</h2><button class="btn-close" type="button" aria-label="Close" dmx-on:click="editDeactivateModal.hide()"></button></div><div class="modal-body"><p>They will no longer be able to sign in. Your profile, group and scope changes will be saved together.</p><p class="text-danger" dmx-show="userForm.lastError.status" dmx-text="userForm.lastError.response.error"></p></div><div class="modal-footer"><button type="button" class="btn btn-bmobile-secondary" dmx-on:click="editDeactivateModal.hide()">Cancel</button><button type="button" class="btn btn-danger" dmx-bind:disabled="userForm.state.executing" dmx-on:click="userForm.submit()">Confirm Deactivation</button></div></div></div></div><% } %>

@@ -1,0 +1,9 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.view" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "count", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "v_notification_unread_recipients", "wheres": { "condition": "AND", "rules": [{ "data": { "column": "user_id" }, "operation": "=", "value": "{{identity}}" }] } } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "unread_count": "{{count}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Unread count could not be loaded." } } }] }
+}

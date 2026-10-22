@@ -1,0 +1,16 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [{ "name": "id", "type": "number" }, { "name": "status", "type": "text" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "escalations.manage" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_POST.id || !['active','inactive'].contains($_POST.status)}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "Choose a rule and active or inactive status." } } }] } } },
+    { "name": "rule", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "escalation_rules", "columns": [{ "column": "id" }, { "column": "status" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.id}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!rule.id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Escalation rule was not found." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{rule.status != $_POST.status}}", "then": { "steps": [
+      { "name": "status_update", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "escalation_rules", "values": [{ "column": "status", "value": "{{$_POST.status}}" }, { "column": "updated_by", "value": "{{identity}}" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{rule.id}}" }, { "data": { "column": "status" }, "operation": "=", "value": "{{rule.status}}" }] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{status_update.affected == 1}}", "then": { "steps": [{ "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "{{$_POST.status == 'active' ? 'escalation_rule_activated' : 'escalation_rule_deactivated'}}" }, { "column": "module", "value": "escalations" }, { "column": "entity_type", "value": "escalation_rule" }, { "column": "entity_id", "value": "{{rule.id}}" }, { "column": "description", "value": "{{'Set escalation rule ' + rule.id + ' to ' + $_POST.status}}" }] } } }] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "rule_id": "{{rule.id}}", "status": "{{$_POST.status}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The rule conflicts with another active rule or could not be updated." } } }] }
+}

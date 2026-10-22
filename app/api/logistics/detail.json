@@ -1,0 +1,1862 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "logistics.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "ttpost_role",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "role_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_LOGISTICS"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "repair_role",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "role_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid logistics case ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "case_detail",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_logistics_case_detail_context",
+            "columns": [
+              {
+                "column": "logistics_case_id"
+              },
+              {
+                "column": "logistics_number"
+              },
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "ticket_number"
+              },
+              {
+                "column": "device_id"
+              },
+              {
+                "column": "original_device_id"
+              },
+              {
+                "column": "original_serial_number"
+              },
+              {
+                "column": "original_asset_tag"
+              },
+              {
+                "column": "device_source"
+              },
+              {
+                "column": "replacement_case_id"
+              },
+              {
+                "column": "replacement_number"
+              },
+              {
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "column": "serial_number"
+              },
+              {
+                "column": "asset_tag"
+              },
+              {
+                "column": "pickup_school_id"
+              },
+              {
+                "column": "pickup_school_name"
+              },
+              {
+                "column": "pickup_district_id"
+              },
+              {
+                "column": "pickup_district_name"
+              },
+              {
+                "column": "repair_centre_location_id"
+              },
+              {
+                "column": "repair_centre_name"
+              },
+              {
+                "column": "current_logistics_status_id"
+              },
+              {
+                "column": "current_logistics_status_code"
+              },
+              {
+                "column": "current_logistics_status_name"
+              },
+              {
+                "column": "requested_at"
+              },
+              {
+                "column": "closed_at"
+              },
+              {
+                "column": "is_active"
+              },
+              {
+                "column": "ticket_current_status_code"
+              },
+              {
+                "column": "allocation_custody_level"
+              },
+              {
+                "column": "allocation_district_id"
+              },
+              {
+                "column": "allocation_school_id"
+              },
+              {
+                "column": "allocation_school_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!case_detail.logistics_case_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Logistics case was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repair_scope_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_logistics_case_detail_context",
+            "columns": [
+              {
+                "column": "logistics_case_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "column": "repair_centre_location_id"
+                  },
+                  "operation": "in",
+                  "value": "{{scope_context.service_locations.flatten('id')}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name == 'REPAIR_CENTRE' && !repair_scope_case.logistics_case_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length > 0 && !scope_context.districts.flatten('id').contains(case_detail.pickup_district_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0 && !scope_context.schools.flatten('id').contains(case_detail.pickup_school_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "return_device_identity",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_logistics_return_device",
+            "columns": [
+              {
+                "column": "original_device_id"
+              },
+              {
+                "column": "return_device_id"
+              },
+              {
+                "column": "completed_replacement_case_id"
+              },
+              {
+                "column": "replacement_physical_custody_code"
+              },
+              {
+                "column": "original_replacement_physical_custody_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "return_device",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "devices",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "serial_number"
+              },
+              {
+                "column": "asset_tag"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{return_device_identity.return_device_id || 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "device_model",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "devices",
+              "alias": "dv"
+            },
+            "columns": [
+              {
+                "table": "mf",
+                "column": "name",
+                "alias": "manufacturer_name"
+              },
+              {
+                "table": "m",
+                "column": "model_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "device_models",
+                "alias": "m",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "m",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "device_model_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "dv",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.device_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "requested_history",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "changed_at",
+                "alias": "requested_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "requested_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "changed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "logistics_statuses",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "REQUESTED"
+                }
+              ]
+            },
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "accepted_history",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "changed_at",
+                "alias": "accepted_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "accepted_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "changed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "logistics_statuses",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "ACCEPTED"
+                }
+              ]
+            },
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "physical_custody",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_logistics_physical_custody",
+              "alias": "p"
+            },
+            "columns": [
+              {
+                "table": "p",
+                "column": "physical_state_code"
+              },
+              {
+                "table": "p",
+                "column": "current_service_location_name",
+                "alias": "physical_location_name"
+              },
+              {
+                "table": "p",
+                "column": "ttpost_location_name"
+              },
+              {
+                "table": "p",
+                "column": "pending_since",
+                "alias": "handoff_dispatched_at"
+              },
+              {
+                "table": "p",
+                "column": "last_handoff_received_at",
+                "alias": "handoff_received_at"
+              },
+              {
+                "table": "dispatch_user",
+                "column": "display_name",
+                "alias": "handoff_dispatched_by"
+              },
+              {
+                "table": "receive_user",
+                "column": "display_name",
+                "alias": "handoff_received_by"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "dispatch_user",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "dispatch_user",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "p",
+                        "column": "handoff_dispatched_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "receive_user",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "receive_user",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "p",
+                        "column": "handoff_received_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "p",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "changed_at"
+              },
+              {
+                "table": "fs",
+                "column": "code",
+                "alias": "from_status_code"
+              },
+              {
+                "table": "fs",
+                "column": "name",
+                "alias": "from_status_name"
+              },
+              {
+                "table": "ts",
+                "column": "code",
+                "alias": "to_status_code"
+              },
+              {
+                "table": "ts",
+                "column": "name",
+                "alias": "to_status_name"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "changed_by_display_name"
+              },
+              {
+                "table": "h",
+                "column": "comment"
+              }
+            ],
+            "joins": [
+              {
+                "table": "logistics_statuses",
+                "alias": "fs",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "fs",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "from_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "logistics_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "changed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "changed_at",
+                "direction": "desc"
+              },
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_history",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{history}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "changed_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "changed_at_display",
+                  "value": "{{changed_at ? changed_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repair_context",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_repair_current_context",
+            "columns": [
+              {
+                "column": "repair_state"
+              },
+              {
+                "column": "started_at"
+              },
+              {
+                "column": "completed_at"
+              },
+              {
+                "column": "outcome_code"
+              },
+              {
+                "column": "outcome_name"
+              },
+              {
+                "column": "outcome_is_return_ready"
+              },
+              {
+                "column": "device_lifecycle_code"
+              },
+              {
+                "column": "allocation_custody_level"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "manufacturer_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "manufacturer_return_cases",
+              "alias": "m"
+            },
+            "columns": [
+              {
+                "table": "m",
+                "column": "id"
+              },
+              {
+                "table": "m",
+                "column": "current_status_code"
+              },
+              {
+                "table": "ec",
+                "column": "current_status_code",
+                "alias": "exception_status_code"
+              },
+              {
+                "table": "pc",
+                "column": "physical_custody_code"
+              }
+            ],
+            "joins": [
+              {
+                "table": "repair_exception_cases",
+                "alias": "ec",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ec",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "exception_case_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_manufacturer_return_physical_custody",
+                "alias": "pc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "pc",
+                      "column": "manufacturer_return_case_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "m",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "m",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "manufacturer_outcome",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturer_return_outcomes",
+            "columns": [
+              {
+                "column": "outcome_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "manufacturer_return_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{manufacturer_case.id || -1}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "open_manufacturer_case",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturer_return_cases",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "column": "active_record_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "manufacturer_return_eligible",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "manufacturer_return_eligible",
+          "value": "{{manufacturer_case.current_status_code == 'COMPLETED' && manufacturer_outcome.outcome_code == 'REPAIRED_ORIGINAL' && manufacturer_case.exception_status_code == 'MANUFACTURER_RETURN_COMPLETED' && manufacturer_case.physical_custody_code == 'REPAIR_CENTRE_RETURN_RECEIVED' && open_manufacturer_case == 0 && case_detail.current_logistics_status_code == 'READY_FOR_RETURN' && case_detail.ticket_current_status_code == 'COMPLETED' && repair_context.completed_at && ((repair_context.allocation_custody_level == 'STUDENT' && repair_context.device_lifecycle_code == 'ASSIGNED') || (repair_context.allocation_custody_level != 'STUDENT' && repair_context.device_lifecycle_code == 'AVAILABLE'))}}"
+        },
+        "output": true
+      },
+      {
+        "name": "handoffs",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "handoff_type"
+              },
+              {
+                "table": "h",
+                "column": "dispatched_at"
+              },
+              {
+                "table": "dispatch_user",
+                "column": "display_name",
+                "alias": "dispatched_by_display_name"
+              },
+              {
+                "table": "h",
+                "column": "received_at"
+              },
+              {
+                "table": "receive_user",
+                "column": "display_name",
+                "alias": "received_by_display_name"
+              },
+              {
+                "table": "from_school",
+                "column": "name",
+                "alias": "from_school_name"
+              },
+              {
+                "table": "from_location",
+                "column": "name",
+                "alias": "from_location_name"
+              },
+              {
+                "table": "to_school",
+                "column": "name",
+                "alias": "to_school_name"
+              },
+              {
+                "table": "to_location",
+                "column": "name",
+                "alias": "to_location_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "dispatch_user",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "dispatch_user",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "dispatched_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "receive_user",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "receive_user",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "received_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "from_school",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "from_school",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "from_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "service_locations",
+                "alias": "from_location",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "from_location",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "from_service_location_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "to_school",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "to_school",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "service_locations",
+                "alias": "to_location",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "to_location",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_service_location_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "dispatched_at",
+                "direction": "asc"
+              },
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "return_handoff",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "school_id"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "h",
+                "column": "received_at",
+                "alias": "returned_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "received_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "schools",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "received_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_TO_SCHOOL"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "received_at"
+                  },
+                  "operator": "is_not_null"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "return_handoff_display",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "returned_at_display",
+          "value": "{{return_handoff.returned_at ? return_handoff.returned_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+        },
+        "output": true
+      },
+      {
+        "name": "display_handoffs",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{handoffs}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "dispatched_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "dispatched_at_display",
+                  "value": "{{dispatched_at ? dispatched_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              },
+              {
+                "name": "received_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "received_at_display",
+                  "value": "{{received_at ? received_at.formatDate('MMMM d, yyyy, h:mm A') : 'Awaiting receipt'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_to_ttpost_handoff",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "dispatched_at"
+              },
+              {
+                "table": "h",
+                "column": "received_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "SCHOOL_TO_TTPOST"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "ttpost_to_repair_handoff",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "dispatched_at"
+              },
+              {
+                "table": "h",
+                "column": "received_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_TO_REPAIR_CENTRE"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "ttpost_to_school_handoff",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "dispatched_at"
+              },
+              {
+                "table": "h",
+                "column": "received_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case_detail.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_TO_SCHOOL"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "logistics_case": "{{case_detail}}",
+            "manufacturer_name": "{{device_model.manufacturer_name}}",
+            "model_name": "{{device_model.model_name}}",
+            "requested_at": "{{requested_history.requested_at}}",
+            "requested_by_display_name": "{{requested_history.requested_by_display_name}}",
+            "accepted_at": "{{accepted_history.accepted_at}}",
+            "accepted_by_display_name": "{{accepted_history.accepted_by_display_name}}",
+            "allocation_context": {
+              "custody_level": "{{case_detail.allocation_custody_level || 'Not allocated'}}",
+              "district_id": "{{case_detail.allocation_district_id}}",
+              "school_id": "{{case_detail.allocation_school_id}}",
+              "school_name": "{{case_detail.allocation_school_name}}"
+            },
+            "return_device_identity": "{{return_device_identity}}",
+            "return_device": "{{return_device}}",
+            "physical_state_code": "{{physical_custody.physical_state_code || (case_detail.current_logistics_status_code == 'RETURNED_TO_SCHOOL' ? 'RETURNED_TO_SCHOOL' : null)}}",
+            "physical_state_label": "{{physical_custody.physical_state_code == 'WITH_RECIPIENT' ? 'With Recipient' : physical_custody.physical_state_code == 'AWAITING_SCHOOL_HANDOFF' ? 'Awaiting School Handoff' : physical_custody.physical_state_code == 'PENDING_TTPOST_RECEIPT' ? 'Awaiting TTPost Receipt' : physical_custody.physical_state_code == 'TTPOST_CUSTODY' ? 'TTPost Custody - Outbound Transit' : physical_custody.physical_state_code == 'PENDING_REPAIR_CENTRE_RECEIPT' ? 'Awaiting Repair Centre Receipt' : physical_custody.physical_state_code == 'REPAIR_CENTRE_CUSTODY' ? 'Repair Centre Custody' : physical_custody.physical_state_code == 'PENDING_TTPOST_RETURN_RECEIPT' ? 'Awaiting TTPost Return Receipt' : physical_custody.physical_state_code == 'TTPOST_RETURN_CUSTODY' ? 'TTPost Return Custody' : physical_custody.physical_state_code == 'PENDING_SCHOOL_RETURN_RECEIPT' ? 'Awaiting School Return Receipt' : case_detail.current_logistics_status_code == 'RETURNED_TO_SCHOOL' ? 'Returned to School' : 'Not recorded'}}",
+            "physical_location_name": "{{physical_custody.physical_location_name}}",
+            "ttpost_location_name": "{{physical_custody.ttpost_location_name}}",
+            "repair_centre_name": "{{case_detail.repair_centre_name}}",
+            "repair": "{{repair_context}}",
+            "manufacturer_return_status": "{{manufacturer_case.current_status_code}}",
+            "manufacturer_return_custody": "{{manufacturer_case.physical_custody_code}}",
+            "manufacturer_return_eligible": "{{manufacturer_return_eligible}}",
+            "handoff_dispatched_at": "{{physical_custody.handoff_dispatched_at}}",
+            "handoff_dispatched_by": "{{physical_custody.handoff_dispatched_by}}",
+            "handoff_received_at": "{{physical_custody.handoff_received_at}}",
+            "handoff_received_by": "{{physical_custody.handoff_received_by}}",
+            "returned_school": "{{return_handoff}}",
+            "returned_at_display": "{{return_handoff_display}}",
+            "status_history": "{{display_history}}",
+            "handoffs": "{{display_handoffs}}",
+            "school_to_ttpost_handoff": "{{school_to_ttpost_handoff}}",
+            "ttpost_to_repair_handoff": "{{ttpost_to_repair_handoff}}",
+            "ttpost_to_school_handoff": "{{ttpost_to_school_handoff}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Logistics case detail could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

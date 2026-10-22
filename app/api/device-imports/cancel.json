@@ -1,0 +1,19 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [{ "name": "batch_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "require_permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "device_imports.manage" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{require_permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "name": "batch", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "device_import_batches", "columns": [{ "column": "id" }, { "column": "status" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.batch_id}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!batch.id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Import batch was not found." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{batch.status == 'committed' || batch.status == 'cancelled'}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "This batch can no longer be cancelled." } } }] } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "cancel_transaction", "module": "dbupdater", "action": "transaction", "options": { "connection": "db", "exec": { "steps": [
+    { "name": "cancel_batch", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "device_import_batches", "values": [{ "column": "status", "value": "cancelled" }, { "column": "cancelled_at", "value": "{{NOW}}" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{batch.id}}" }, { "data": { "column": "status" }, "operator": "in", "value": ["uploaded", "validation_failed", "ready"] }] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{cancel_batch.affected < 1}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "DEVICE_IMPORT_CANCEL_STATE_CHANGED" } }] } } },
+      { "name": "audit_cancel", "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "device_import_cancelled" }, { "column": "module", "value": "device_imports" }, { "column": "entity_type", "value": "device_import_batch" }, { "column": "entity_id", "value": "{{batch.id}}" }, { "column": "description", "value": "Device import batch cancelled." }] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "batch_id": "{{batch.id}}", "status": "cancelled" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The batch could not be cancelled." } } }] }
+}

@@ -1,0 +1,372 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "text",
+        "name": "login_identifier"
+      },
+      {
+        "type": "text",
+        "name": "username"
+      },
+      {
+        "type": "text",
+        "name": "password"
+      },
+      {
+        "type": "boolean",
+        "name": "remember"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "login_identifier",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "login_identifier",
+          "value": "{{trim($_POST.login_identifier ? $_POST.login_identifier : ($_POST.username ? $_POST.username : ''))}}"
+        },
+        "meta": [],
+        "outputType": "text"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!login_identifier || !$_POST.password}}",
+          "then": {
+            "steps": {
+              "module": "core",
+              "action": "response",
+              "options": {
+                "status": 401,
+                "data": {
+                  "success": false,
+                  "error": "Invalid username/email or password."
+                }
+              }
+            }
+          }
+        },
+        "outputType": "boolean"
+      },
+      {
+        "name": "matched_login",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_login_identities",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "login_identifier"
+              },
+              {
+                "column": "password_hash"
+              }
+            ],
+            "wheres": {
+              "condition": "OR",
+              "rules": [
+                {
+                  "data": {
+                    "column": "login_identifier"
+                  },
+                  "operation": "=",
+                  "value": "{{login_identifier}}"
+                },
+                {
+                  "data": {
+                    "column": "login_identifier"
+                  },
+                  "operation": "=",
+                  "value": "{{lowercase(login_identifier)}}"
+                }
+              ]
+            }
+          }
+        },
+        "meta": [],
+        "outputType": "object"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!matched_login.id}}",
+          "then": {
+            "steps": {
+              "module": "core",
+              "action": "response",
+              "options": {
+                "status": 401,
+                "data": {
+                  "success": false,
+                  "error": "Invalid username/email or password."
+                }
+              }
+            }
+          }
+        },
+        "outputType": "boolean"
+      },
+      {
+        "name": "password_valid",
+        "module": "crypto",
+        "action": "passwordVerify",
+        "options": {
+          "password": "{{$_POST.password}}",
+          "hash": "{{matched_login.password_hash}}"
+        },
+        "outputType": "boolean"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!password_valid}}",
+          "then": {
+            "steps": {
+              "module": "core",
+              "action": "response",
+              "options": {
+                "status": 401,
+                "data": {
+                  "success": false,
+                  "error": "Invalid username/email or password."
+                }
+              }
+            }
+          }
+        },
+        "outputType": "boolean"
+      },
+      {
+        "name": "login",
+        "module": "auth",
+        "action": "login",
+        "options": {
+          "provider": "portalSecurity",
+          "username": "{{matched_login.login_identifier}}",
+          "password": "{{$_POST.password}}",
+          "remember": "{{$_POST.remember}}"
+        },
+        "meta": []
+      },
+      {
+        "name": "login_user",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              { "column": "id" },
+              { "column": "status" },
+              { "column": "auth_version" }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                { "data": { "column": "id" }, "operation": "=", "value": "{{matched_login.id}}" }
+              ]
+            }
+          }
+        },
+        "outputType": "object"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!login_user.id || login_user.status != 'active' || !login_user.auth_version}}",
+          "then": {
+            "steps": [
+              { "module": "auth", "action": "logout", "options": { "provider": "portalSecurity" } },
+              { "module": "core", "action": "response", "options": { "status": 401, "data": { "success": false, "error": "Invalid username/email or password." } } }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setsession",
+        "name": "portalSecurityAuthVersion",
+        "options": { "value": "{{login_user.auth_version}}" }
+      },
+      {
+        "name": "update_last_login",
+        "module": "dbupdater",
+        "action": "update",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "values": [
+              {
+                "column": "last_login_at",
+                "value": "{{NOW}}"
+              },
+              {
+                "column": "updated_at",
+                "value": "{{NOW}}"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{matched_login.id}}"
+                }
+              ]
+            }
+          }
+        },
+        "meta": [
+          {
+            "name": "affected",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "name": "audit_login",
+        "module": "dbupdater",
+        "action": "insert",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "audit_logs",
+            "values": [
+              {
+                "column": "actor_user_id",
+                "value": "{{matched_login.id}}"
+              },
+              {
+                "column": "action",
+                "value": "login_success"
+              },
+              {
+                "column": "module",
+                "value": "security"
+              },
+              {
+                "column": "entity_type",
+                "value": "user"
+              },
+              {
+                "column": "entity_id",
+                "value": "{{matched_login.id}}"
+              },
+              {
+                "column": "description",
+                "value": "User signed in."
+              },
+              {
+                "column": "created_at",
+                "value": "{{NOW}}"
+              }
+            ]
+          }
+        },
+        "meta": [
+          {
+            "name": "identity",
+            "type": "text"
+          },
+          {
+            "name": "affected",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "name": "login_permissions",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_effective_permissions",
+            "distinct": true,
+            "columns": [
+              {
+                "column": "permission_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{matched_login.id}}"
+                }
+              ]
+            }
+          }
+        },
+        "outputType": "array"
+      },
+      {
+        "name": "login_redirect",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "login_redirect",
+          "value": "{{login_permissions.flatten('permission_name').contains('dashboard.view') ? '/' : (login_permissions.flatten('permission_name').contains('tickets.view') ? '/tickets' : (login_permissions.flatten('permission_name').contains('devices.view') ? '/devices' : (login_permissions.flatten('permission_name').contains('students.view') ? '/students' : '/login')))}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "redirect": "{{login_redirect}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 401,
+            "data": {
+              "success": false,
+              "error": "Invalid username/email or password."
+            }
+          }
+        }
+      ],
+      "options": {}
+    }
+  },
+  "usedModules": {
+    "argon2": "^0.30.2"
+  }
+}

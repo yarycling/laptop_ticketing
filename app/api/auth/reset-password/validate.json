@@ -1,0 +1,191 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "r",
+        "type": "text"
+      },
+      {
+        "name": "token",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.r || $_GET.r.length() != 52 || !$_GET.token || $_GET.token.length() > 128}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "valid": false,
+                    "purpose": "{{reset_request.purpose}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "reset_request",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "password_reset_requests",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "request_id"
+              },
+              {
+                "column": "user_id"
+              },
+              {
+                "column": "token_hash"
+              },
+              {
+                "column": "purpose"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "request_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.r}}"
+                },
+                {
+                  "data": {
+                    "column": "used_at"
+                  },
+                  "operator": "is_null"
+                },
+                {
+                  "data": {
+                    "column": "invalidated_at"
+                  },
+                  "operator": "is_null"
+                },
+                {
+                  "data": {
+                    "column": "expires_at"
+                  },
+                  "operation": ">",
+                  "value": "{{NOW}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "valid_secret",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "valid_secret",
+          "value": false
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{reset_request.id && $_GET.token && $_GET.token.length() <= 128}}",
+          "then": {
+            "steps": [
+              {
+                "name": "valid_secret",
+                "module": "crypto",
+                "action": "passwordVerify",
+                "options": {
+                  "password": "{{$_GET.token}}",
+                  "hash": "{{reset_request.token_hash}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "active_user",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{reset_request.user_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "valid": "{{valid_secret && active_user.status == 'active'}}",
+            "purpose": "{{reset_request.purpose}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 200,
+            "data": {
+              "valid": false,
+              "purpose": "{{reset_request.purpose}}"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

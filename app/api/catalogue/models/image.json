@@ -1,0 +1,152 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid model ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "model",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "device_models",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "image_path"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!model.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Model image was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!model.image_path}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "No image is available for this model."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "fs",
+        "action": "download",
+        "options": {
+          "path": "{{model.image_path}}"
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "The model image could not be loaded."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

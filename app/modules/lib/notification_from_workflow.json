@@ -1,0 +1,773 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "name": "failure_stage",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "failure_stage",
+          "value": "source_context"
+        }
+      },
+      {
+        "name": "context",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "tickets",
+            "columns": [
+              { "column": "id", "alias": "ticket_id" },
+              { "column": "ticket_number" },
+              { "column": "origin_school_id" },
+              { "column": "origin_district_id" },
+              { "column": "device_id" }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": { "column": "id" },
+                  "operation": "=",
+                  "value": "{{$_PARAM.ticket_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": { "key": "failure_stage", "value": "origin_context_lookups" }
+      },
+      {
+        "name": "school",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": { "table": "schools", "columns": [{ "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{context.origin_school_id}}" }] } }
+        }
+      },
+      {
+        "name": "district",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": { "table": "districts", "columns": [{ "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{context.origin_district_id}}" }] } }
+        }
+      },
+      {
+        "name": "device",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": { "table": "devices", "columns": [{ "column": "serial_number" }, { "column": "asset_tag" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{context.device_id}}" }] } }
+        }
+      },
+      {
+        "name": "logistics_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_logistics_cases",
+              "alias": "lc"
+            },
+            "columns": [{ "column": "id" }, { "column": "logistics_number" }, { "column": "repair_centre_location_id" }],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "lc",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.logistics_case_id || 0}}"
+                },
+                {
+                  "data": {
+                    "table": "lc",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.ticket_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "repair_job",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "repair_jobs",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "logistics_case_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.repair_job_id || 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": { "key": "failure_stage", "value": "event_type_lookup" }
+      },
+      {
+        "name": "event_type",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "notification_event_types",
+            "columns": [
+              {
+                "column": "code"
+              },
+              {
+                "column": "name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.event_type_code}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!event_type.code}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "WORKFLOW_NOTIFICATION_TYPE_INVALID"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "failure_stage",
+          "value": "source_validation"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!context.ticket_id || (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_READY_FOR_RETURN_PICKUP','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) && !logistics_case.id) || (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) && (!repair_job.id || repair_job.logistics_case_id != logistics_case.id))}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "WORKFLOW_NOTIFICATION_SOURCE_INVALID"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "scope_location_id",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "scope_location_id",
+          "value": "{{$_PARAM.location_id || (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_READY_FOR_RETURN_PICKUP'].contains($_PARAM.event_type_code) ? 0 : (logistics_case.repair_centre_location_id || 0))}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": { "key": "failure_stage", "value": "recipient_query" }
+      },
+      {
+        "name": "recipients",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "users",
+              "alias": "u"
+            },
+            "columns": [
+              {
+                "table": "u",
+                "column": "id",
+                "alias": "recipient_user_id"
+              },
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "recipient_role_code"
+              }
+            ],
+            "joins": [
+              {
+                "table": "user_roles",
+                "alias": "ur",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ur",
+                      "column": "user_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "u",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "user_school_scopes",
+                "alias": "ss",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ss",
+                      "column": "user_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "u",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "user_district_scopes",
+                "alias": "ds",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ds",
+                      "column": "user_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "u",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "user_service_location_scopes",
+                "alias": "ls",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ls",
+                      "column": "user_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "u",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "user_national_scopes",
+                "alias": "ns",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ns",
+                      "column": "user_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "u",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "u",
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{['TICKET_SUBMITTED','TICKET_CLARIFICATION_REQUESTED','TICKET_APPROVED_FOR_PICKUP','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL','REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code)}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "r",
+                            "column": "name"
+                          },
+                          "operation": "in",
+                          "value": [
+                            "SCHOOL_ADMINISTRATOR",
+                            "ICT_TECHNICAL_OFFICER"
+                          ]
+                        },
+                        {
+                          "data": {
+                            "table": "ss",
+                            "column": "id"
+                          },
+                          "operator": "is_not_null"
+                        },
+                        {
+                          "data": {
+                            "table": "ss",
+                            "column": "school_id"
+                          },
+                          "operation": "=",
+                          "value": "{{context.origin_school_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "ss",
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{['DISTRICT_APPROVAL_REQUIRED','DISTRICT_REPAIR_DECISION_REQUIRED','LOGISTICS_RETURNED_TO_SCHOOL','REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code)}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "r",
+                            "column": "name"
+                          },
+                          "operation": "=",
+                          "value": "ICT_DISTRICT_COORDINATOR"
+                        },
+                        {
+                          "data": {
+                            "table": "ds",
+                            "column": "id"
+                          },
+                          "operator": "is_not_null"
+                        },
+                        {
+                          "data": {
+                            "table": "ds",
+                            "column": "district_id"
+                          },
+                          "operation": "=",
+                          "value": "{{context.origin_district_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "ds",
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_SCHOOL_RELEASED','LOGISTICS_READY_FOR_RETURN_PICKUP'].contains($_PARAM.event_type_code)}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "r",
+                            "column": "name"
+                          },
+                          "operation": "=",
+                          "value": "TTPOST_LOGISTICS"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{$_PARAM.event_type_code == 'LOGISTICS_SENT_TO_REPAIR_CENTRE'}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "r",
+                            "column": "name"
+                          },
+                          "operation": "=",
+                          "value": "REPAIR_CENTRE"
+                        },
+                        {
+                          "data": {
+                            "table": "ls",
+                            "column": "id"
+                          },
+                          "operator": "is_not_null"
+                        },
+                        {
+                          "data": {
+                            "table": "ls",
+                            "column": "service_location_id"
+                          },
+                          "operation": "=",
+                          "value": "{{scope_location_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "ls",
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{$_PARAM.event_type_code == 'HEAD_OFFICE_REPLACEMENT_APPROVAL_REQUIRED'}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "r",
+                            "column": "name"
+                          },
+                          "operation": "=",
+                          "value": "MOE_HEAD_OFFICE"
+                        },
+                        {
+                          "data": {
+                            "table": "ns",
+                            "column": "id"
+                          },
+                          "operator": "is_not_null"
+                        },
+                        {
+                          "data": {
+                            "table": "ns",
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "failure_stage",
+          "value": "recipient_selection"
+        }
+      },
+      {
+        "name": "eligible_recipients",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "eligible_recipients",
+          "value": "{{recipients}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!eligible_recipients || eligible_recipients.length == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "WORKFLOW_NOTIFICATION_RECIPIENTS_EMPTY"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "event_title",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "event_title",
+          "value": "{{event_type.name + ' · ' + context.ticket_number}}"
+        }
+      },
+      {
+        "name": "event_message",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "event_message",
+          "value": "{{$_PARAM.message || ($_PARAM.event_type_code == 'TICKET_SUBMITTED' ? 'A new ticket requires initial school-level attention.' : ($_PARAM.event_type_code == 'DISTRICT_APPROVAL_REQUIRED' ? 'The school diagnosis is complete and this ticket requires District Coordinator action.' : ($_PARAM.event_type_code == 'TICKET_APPROVED_FOR_PICKUP' ? 'District approval is complete. The case is ready for pickup logistics.' : ($_PARAM.event_type_code == 'LOGISTICS_READY_FOR_RETURN_PICKUP' ? 'Repair is complete and TTPost pickup is the next action.' : 'A workflow update requires attention for ' + context.ticket_number + '.'))))}}"
+        }
+      },
+      {
+        "name": "event_severity",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "event_severity",
+          "value": "{{['DISTRICT_APPROVAL_REQUIRED','TICKET_CLARIFICATION_REQUESTED','DISTRICT_REPAIR_DECISION_REQUIRED','HEAD_OFFICE_REPLACEMENT_APPROVAL_REQUIRED'].contains($_PARAM.event_type_code) ? 'WARNING' : (['LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURNED_TO_SCHOOL','REPAIR_COMPLETED','TICKET_APPROVED_FOR_PICKUP'].contains($_PARAM.event_type_code) ? 'SUCCESS' : 'INFO')}}"
+        }
+      },
+      {
+        "name": "event_key",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "event_key",
+          "value": "{{['TICKET_SUBMITTED','TICKET_CLARIFICATION_REQUESTED','DISTRICT_APPROVAL_REQUIRED','TICKET_APPROVED_FOR_PICKUP'].contains($_PARAM.event_type_code) ? 'TICKET:' + context.ticket_id + ':' + ($_PARAM.event_type_code == 'TICKET_SUBMITTED' ? 'SUBMITTED' : ($_PARAM.event_type_code == 'TICKET_CLARIFICATION_REQUESTED' ? 'CLARIFICATION:' + ($_PARAM.source_id || 'REQUEST') : ($_PARAM.event_type_code == 'DISTRICT_APPROVAL_REQUIRED' ? 'DISTRICT_APPROVAL_REQUIRED' : 'APPROVED_FOR_PICKUP'))) : (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_READY_FOR_RETURN_PICKUP'].contains($_PARAM.event_type_code) ? 'LOGISTICS:' + logistics_case.id + ':' + ($_PARAM.event_type_code == 'LOGISTICS_PICKUP_REQUESTED' ? 'PICKUP_REQUESTED' : 'READY_FOR_RETURN_PICKUP') : (['LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) ? 'HANDOFF:' + ($_PARAM.handoff_id || $_PARAM.source_id) + ':' + $_PARAM.event_type_code : (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) ? 'REPAIR:' + repair_job.id + ':' + $_PARAM.event_type_code.replace('REPAIR_','') : 'EXCEPTION:' + ($_PARAM.exception_case_id || $_PARAM.source_id) + ':' + $_PARAM.event_type_code)))}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "failure_stage",
+          "value": "notification_creation"
+        }
+      },
+      {
+        "name": "create_each",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{eligible_recipients}}",
+          "exec": {
+            "steps": [
+              {
+                "name": "create_notification",
+                "module": "core",
+                "action": "exec",
+                "output": true,
+                "options": {
+                  "exec": "notification_create",
+                  "params": {
+                    "idempotency_key": "{{event_key}}",
+                    "event_type_code": "{{$_PARAM.event_type_code}}",
+                    "source_type": "{{$_PARAM.source_type || (['TICKET_SUBMITTED','TICKET_CLARIFICATION_REQUESTED','DISTRICT_APPROVAL_REQUIRED','TICKET_APPROVED_FOR_PICKUP'].contains($_PARAM.event_type_code) ? 'TICKET' : (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_READY_FOR_RETURN_PICKUP'].contains($_PARAM.event_type_code) ? 'LOGISTICS' : (['LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) ? 'LOGISTICS_HANDOFF' : (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) ? 'REPAIR' : 'REPAIR_EXCEPTION'))))}}",
+                    "source_id": "{{$_PARAM.source_id || (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_READY_FOR_RETURN_PICKUP'].contains($_PARAM.event_type_code) ? logistics_case.id : (['LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) ? $_PARAM.handoff_id : (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) ? repair_job.id : ($_PARAM.exception_case_id || context.ticket_id))))}}",
+                    "ticket_id": "{{context.ticket_id}}",
+                    "logistics_case_id": "{{logistics_case.id || null}}",
+                    "repair_job_id": "{{repair_job.id || null}}",
+                    "severity_code": "{{event_severity}}",
+                    "title": "{{event_title}}",
+                    "message": "{{event_message}}",
+                    "action_type": "{{$_PARAM.action_type || (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_READY_FOR_RETURN_PICKUP','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) ? 'LOGISTICS_DETAIL' : (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) ? 'REPAIR_DETAIL' : ($_PARAM.event_type_code == 'DISTRICT_REPAIR_DECISION_REQUIRED' || $_PARAM.event_type_code == 'HEAD_OFFICE_REPLACEMENT_APPROVAL_REQUIRED' ? 'EXCEPTION_DETAIL' : 'TICKET_DETAIL')))}}",
+                    "action_reference": "{{$_PARAM.action_reference || (['LOGISTICS_PICKUP_REQUESTED','LOGISTICS_SCHOOL_RELEASED','LOGISTICS_RECEIVED_BY_TTPOST','LOGISTICS_SENT_TO_REPAIR_CENTRE','LOGISTICS_RECEIVED_BY_REPAIR_CENTRE','LOGISTICS_READY_FOR_RETURN_PICKUP','LOGISTICS_RETURN_RECEIVED_BY_TTPOST','LOGISTICS_RETURN_IN_TRANSIT_TO_SCHOOL','LOGISTICS_RETURNED_TO_SCHOOL'].contains($_PARAM.event_type_code) ? logistics_case.id : (['REPAIR_STARTED','REPAIR_COMPLETED'].contains($_PARAM.event_type_code) ? repair_job.id : ($_PARAM.exception_case_id || context.ticket_id)))}}",
+                    "recipient_user_id": "{{recipient_user_id}}",
+                    "recipient_role_code": "{{recipient_role_code}}",
+                    "created_by": "{{$_PARAM.actor_user_id || null}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "workflow_event",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "notification_events",
+            "columns": [{ "column": "id" }],
+            "wheres": {
+              "condition": "AND",
+              "rules": [{ "data": { "column": "idempotency_key" }, "operation": "=", "value": "{{event_key}}" }]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{workflow_event.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "enqueue_email_for_each_recipient",
+                "module": "core",
+                "action": "repeat",
+                "options": {
+                  "repeat": "{{eligible_recipients}}",
+                  "exec": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "exec",
+                        "options": {
+                          "exec": "notification_email_enqueue",
+                          "params": {
+                            "notification_event_id": "{{workflow_event.id}}",
+                            "recipient_user_id": "{{recipient_user_id}}",
+                            "actor_user_id": "{{$_PARAM.actor_user_id || null}}"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "notification_count",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "notification_count",
+          "value": "{{eligible_recipients.length}}"
+        }
+      }
+    ],
+    "catch": [
+      {
+        "name": "failure_audit",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "notification_workflow_failure_audit",
+          "params": {
+            "actor_user_id": "{{$_PARAM.actor_user_id || null}}",
+            "source_type": "{{$_PARAM.event_type_code || 'WORKFLOW'}}",
+            "source_id": "{{$_PARAM.exception_case_id || $_PARAM.handoff_id || $_PARAM.repair_job_id || $_PARAM.logistics_case_id || $_PARAM.ticket_id}}",
+            "failure_stage": "{{failure_stage || 'unknown'}}",
+            "ticket_id": "{{$_PARAM.ticket_id || null}}"
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "notification_failed",
+          "value": true
+        }
+      }
+    ]
+  }
+}

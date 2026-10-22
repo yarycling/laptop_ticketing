@@ -1,0 +1,50 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "school_id"
+      }
+    ],
+    "$_GET": [
+      {
+        "type": "number",
+        "name": "school_id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_scope",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_school_scope",
+          "params": {
+            "school_id": "{{$_POST.school_id ? $_POST.school_id : $_GET.school_id}}"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "scope": "{{require_scope.scope}}",
+            "school_id": "{{require_scope.school_id}}"
+          }
+        }
+      }
+    ]
+  }
+}

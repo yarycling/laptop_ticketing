@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "authenticated": true,
+            "has_national_scope": "{{scope_context.has_national_scope}}",
+            "districts": "{{scope_context.districts}}",
+            "schools": "{{scope_context.schools}}",
+            "service_locations": "{{scope_context.service_locations}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

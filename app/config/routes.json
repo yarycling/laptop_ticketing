@@ -1,0 +1,484 @@
+{
+  "routes": [
+    {
+      "path": "/login",
+      "page": "login",
+      "layout": "main",
+      "routeType": "page"
+    },
+    {
+      "path": "/forgot-password",
+      "page": "forgot-password",
+      "layout": "auth",
+      "routeType": "page"
+    },
+    {
+      "path": "/reset-password",
+      "page": "reset-password",
+      "layout": "auth",
+      "routeType": "page"
+    },
+    {
+      "path": "/",
+      "page": "index",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_dashboard_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/organisation",
+      "page": "admin/organisation",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_admin_access",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/logistics-locations",
+      "page": "admin/logistics-locations",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_logistics_locations_manage",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/spare-pools",
+      "page": "admin/spare-pools",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_spare_pools_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/students",
+      "page": "students",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_students_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/devices",
+      "page": "devices",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_devices_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/devices/detail",
+      "page": "devices-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_devices_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/device-allocations/districts",
+      "page": "device-allocations/districts",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_district_allocations_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/device-allocations/schools",
+      "page": "device-allocations/schools",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_school_allocations_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/device-assignments/students",
+      "page": "device-assignments/students",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_student_assignments_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/tickets",
+      "page": "tickets",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_ticket_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/tickets/dashboard",
+      "page": "tickets-dashboard",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_ticket_dashboard",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/tickets/new",
+      "page": "tickets-new",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_ticket_create",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/tickets/detail",
+      "page": "tickets-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_ticket_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/logistics",
+      "page": "logistics",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_logistics_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/logistics/detail",
+      "page": "logistics-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_logistics_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/repairs",
+      "page": "repairs",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_repairs_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/repairs/detail",
+      "page": "repairs-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_repairs_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/exceptions",
+      "page": "exceptions",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_exceptions_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/exceptions/detail",
+      "page": "exceptions-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_exceptions_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/device-catalogue",
+      "page": "admin/device-catalogue",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_devices_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/device-imports",
+      "page": "admin/device-imports",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_imports_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/device-imports/detail",
+      "page": "admin/device-imports-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_imports_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/manufacturer-returns",
+      "page": "manufacturer-returns",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_manufacturer_returns_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/manufacturer-returns/detail",
+      "page": "manufacturer-returns-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_manufacturer_returns_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/permanent-replacements",
+      "page": "permanent-replacements",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_replacements_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/device-stock",
+      "page": "device-stock",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_stock_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/device-stock/detail",
+      "page": "device-stock-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_device_stock_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/permanent-replacements/detail",
+      "page": "permanent-replacements-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_replacements_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/temporary-loans",
+      "page": "temporary-loans",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_temporary_loans_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/temporary-loans/detail",
+      "page": "temporary-loans-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_temporary_loans_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/carriers",
+      "page": "admin/carriers",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_carriers_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/sla",
+      "page": "admin/sla",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_sla_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/sla",
+      "page": "sla-tracking",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_sla_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/escalations",
+      "page": "escalations",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_escalations_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/escalations",
+      "page": "admin/escalations",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_escalations_manage",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/notifications",
+      "page": "notifications",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_notifications_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/users",
+      "page": "admin/users",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_users_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/users/new",
+      "page": "admin/users-new",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_users_create",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/users/edit",
+      "page": "admin/users-edit",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_users_update",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/users/detail",
+      "page": "admin/users-detail",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_users_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    },
+    {
+      "path": "/admin/security-groups",
+      "page": "admin/security-groups",
+      "layout": "main",
+      "routeType": "page",
+      "exec": "modules/lib/security_require_security_groups_view",
+      "restrict": {
+        "provider": "portalSecurity",
+        "loginUrl": "/login"
+      }
+    }
+  ]
+}

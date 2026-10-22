@@ -1,0 +1,9 @@
+{
+  "name": "wappler-phone-mask",
+  "version": "1.0.0",
+  "description": "Wappler App Connect phone input mask component backed by Inputmask",
+  "private": true,
+  "dependencies": {
+    "inputmask": "^5.0.10"
+  }
+}

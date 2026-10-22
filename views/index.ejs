@@ -1,0 +1,71 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="index" appConnect="local" -->
+<meta name="ac:route" content="/">
+
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="scopeContext" url="/api/auth/scope_context"></dmx-serverconnect> 
+  <%- await include("partials/portal-sidebar", { currentPage: "dashboard" }) %>
+
+  
+
+  <div class="portal-workspace">
+    <%- await include("partials/portal-topbar") %>
+
+    <main class="portal-main" aria-label="Dashboard">
+      <section class="dashboard-hero">
+        <div>
+          <h1>Welcome back</h1>
+          <p>Laptop Warranty &amp; Repair Management Portal</p>
+          <span>Ministry of Education <strong></strong> Powered by bmobile</span>
+        </div>
+      </section>
+
+      <section class="kpi-grid" aria-label="Key portal metrics">
+        <article class="kpi-card"><span class="kpi-icon kpi-blue"><i class="fas fa-laptop" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>Total Laptops</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+        <article class="kpi-card"><span class="kpi-icon kpi-green"><i class="far fa-clipboard" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>Open Tickets</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+        <article class="kpi-card"><span class="kpi-icon kpi-amber"><i class="fas fa-truck" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>Awaiting Collection</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+        <article class="kpi-card"><span class="kpi-icon kpi-purple"><i class="fas fa-wrench" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>In Repair</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+        <article class="kpi-card"><span class="kpi-icon kpi-red"><i class="fas fa-share-square" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>Ready for Return</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+        <article class="kpi-card"><span class="kpi-icon kpi-neutral"><i class="fas fa-check-circle" aria-hidden="true"></i></span><div><strong>&mdash;</strong><span>Closed This Month</span></div><p class="placeholder-trend">Awaiting data source</p></article>
+      </section>
+
+      <section class="dashboard-grid">
+        <article class="portal-card chart-card">
+          <div class="card-heading-row"><h2>Tickets by Status</h2><button class="btn btn-bmobile-secondary btn-sm" type="button" disabled>This Month</button></div>
+          <div class="chart-placeholder"><div class="empty-state"><i class="far fa-chart-bar" aria-hidden="true"></i><h3>No chart data available</h3><p>Ticket status reporting will appear when dashboard endpoints are added.</p></div></div>
+        </article>
+        <article class="portal-card warranty-card">
+          <h2>Laptops by Warranty Status</h2>
+          <div class="warranty-placeholder"><div class="donut-placeholder" aria-hidden="true"></div><div class="status-legend"><span><i class="legend-dot dot-success"></i>In Warranty <strong>&mdash;</strong></span><span><i class="legend-dot dot-warning"></i>Expiring <strong>&mdash;</strong></span><span><i class="legend-dot dot-danger"></i>Out of Warranty <strong>&mdash;</strong></span></div></div>
+        </article>
+        <article class="portal-card status-summary-card">
+          <div class="card-heading-row"><h2>Collection &amp; Return Status</h2><a href="#">View All</a></div>
+          <div class="status-list">
+            <div class="status-row"><span><i class="fas fa-truck" aria-hidden="true"></i>Scheduled for Collection</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+            <div class="status-row"><span><i class="fas fa-truck" aria-hidden="true"></i>In Transit to Repair Centre</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+            <div class="status-row"><span><i class="fas fa-wrench" aria-hidden="true"></i>At Repair Centre</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+            <div class="status-row"><span><i class="fas fa-tools" aria-hidden="true"></i>Completed Repair</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+            <div class="status-row"><span><i class="fas fa-box" aria-hidden="true"></i>In Transit to School</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+            <div class="status-row"><span><i class="fas fa-check" aria-hidden="true"></i>Delivered / Returned</span><strong>&mdash;</strong><i class="fas fa-chevron-right" aria-hidden="true"></i></div>
+          </div>
+        </article>
+        <article class="portal-card recent-tickets-card">
+          <div class="card-heading-row"><h2>Recent Tickets</h2><a href="#">View All</a></div>
+          <div class="table-responsive portal-table-wrapper">
+            <table class="table portal-table align-middle">
+              <thead><tr><th>Ticket #</th><th>Date</th><th>Laptop / Asset Tag</th><th>Student</th><th>School</th><th>Issue Category</th><th>Status</th><th>Priority</th></tr></thead>
+              <tbody><tr><td colspan="8"><div class="empty-state empty-state-row"><i class="far fa-folder-open" aria-hidden="true"></i><span>No recent tickets to display.</span></div></td></tr></tbody>
+            </table>
+          </div>
+          <div class="mobile-empty-list"><div class="empty-state"><i class="far fa-folder-open" aria-hidden="true"></i><h3>No recent tickets to display.</h3><p>Ticket activity will appear here after the ticket module is connected.</p></div></div>
+        </article>
+        <article class="portal-card upcoming-card">
+          <div class="card-heading-row"><h2>Upcoming Collections</h2><a href="#">View All</a></div>
+          <div class="empty-state"><i class="far fa-calendar-alt" aria-hidden="true"></i><h3>No upcoming collections scheduled.</h3><p>Collection requests will appear when logistics workflows are added.</p></div>
+        </article>
+      </section>
+    </main>
+  </div>
+</div>
+
+

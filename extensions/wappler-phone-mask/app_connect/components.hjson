@@ -1,0 +1,33 @@
+{
+  components: [
+    {
+      type: 'dmx-phone-mask',
+      selector: 'input[is=dmx-phone-mask]',
+      groupTitle: 'Form Controls',
+      groupIcon: 'fa fa-lg fa-keyboard-o',
+      title: 'Phone Mask',
+      icon: 'fa fa-lg fa-phone',
+      help: 'Formats phone input as it is typed.',
+      template: '<input is="dmx-phone-mask" id="@@id@@" type="tel" inputmode="tel" mask="(999)999-9999">',
+      baseName: 'phoneMask',
+      properties: [
+        {
+          group: 'Phone Mask Properties',
+          variables: [
+            { name: 'phoneMaskId', attribute: 'id', title: 'ID', type: 'text', defaultValue: '', required: true },
+            { name: 'phoneMask', attribute: 'mask', title: 'Mask', type: 'text', defaultValue: '(999)999-9999', required: true }
+          ]
+        }
+      ],
+      copyFiles: [
+        { src: 'includes/dmx-phone-mask.js', dst: 'js/dmx-phone-mask.js' },
+        { src: 'includes/inputmask.min.js', dst: 'js/inputmask.min.js' }
+      ],
+      linkFiles: [
+        { src: 'js/inputmask.min.js', type: 'js', defer: true },
+        { src: 'js/dmx-phone-mask.js', type: 'js', defer: true }
+      ],
+      jsOrder: ['inputmask.min.js', 'dmx-phone-mask.js']
+    }
+  ]
+}

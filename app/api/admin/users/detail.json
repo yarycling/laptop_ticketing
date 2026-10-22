@@ -1,0 +1,402 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "users.view"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "username"
+              },
+              {
+                "column": "email"
+              },
+              {
+                "column": "display_name"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "last_login_at"
+              },
+              {
+                "column": "password_changed_at"
+              },
+              {
+                "column": "created_at"
+              },
+              {
+                "column": "updated_at"
+              },
+              {
+                "column": "security_groups"
+              },
+              {
+                "column": "scope_summary"
+              },
+              {
+                "column": "auth_version"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.user_id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "user"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!user.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "User not found."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_roles",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "label"
+              },
+              {
+                "column": "scope_type"
+              }
+            ],
+            "orders": [
+              {
+                "column": "name",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "roles"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_scopes",
+            "columns": [
+              {
+                "column": "scope_type"
+              },
+              {
+                "column": "entity_id"
+              },
+              {
+                "column": "district_id"
+              },
+              {
+                "column": "label"
+              },
+              {
+                "column": "entity_active"
+              }
+            ],
+            "orders": [
+              {
+                "column": "scope_type",
+                "direction": "asc"
+              },
+              {
+                "column": "entity_id",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "scopes"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "p",
+                "column": "name",
+                "alias": "permission_name"
+              }
+            ],
+            "distinct": true,
+            "joins": [
+              {
+                "table": "role_permissions",
+                "alias": "rp",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rp",
+                      "column": "role_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "permissions",
+                "alias": "p",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "p",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "rp",
+                        "column": "permission_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "orders": [
+              {
+                "table": "p",
+                "column": "name",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "permissions"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "audit_logs",
+            "columns": [
+              {
+                "column": "action"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "actor_user_id"
+              },
+              {
+                "column": "created_at"
+              }
+            ],
+            "limit": 30,
+            "orders": [
+              {
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "entity_type"
+                  },
+                  "operation": "=",
+                  "value": "user"
+                },
+                {
+                  "data": {
+                    "column": "entity_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                },
+                {
+                  "data": {
+                    "column": "module"
+                  },
+                  "operation": "=",
+                  "value": "user_administration"
+                }
+              ]
+            }
+          }
+        },
+        "name": "activity"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "user": "{{user}}",
+            "roles": "{{roles}}",
+            "role_codes": "{{roles.flatten('name')}}",
+            "scopes": "{{scopes}}",
+            "district_ids": "{{scopes.where('scope_type','==','DISTRICT').flatten('entity_id')}}",
+            "school_ids": "{{scopes.where('scope_type','==','SCHOOL').flatten('entity_id')}}",
+            "school_district_ids": "{{scopes.where('scope_type','==','SCHOOL').flatten('district_id').unique()}}",
+            "service_location_ids": "{{scopes.where('scope_type','==','REPAIR_LOCATION').flatten('entity_id')}}",
+            "permissions": "{{permissions}}",
+            "activity": "{{activity}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "user_id",
+        "type": "text"
+      }
+    ]
+  }
+}

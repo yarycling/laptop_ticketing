@@ -1,0 +1,153 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_PARAM.district_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "District is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "restrict",
+        "module": "auth",
+        "action": "restrict",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "national_scope_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_national_scopes",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "district_scope_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_district_scopes",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "district_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.district_id}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{national_scope_count == 0 && district_scope_count == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "success",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "success",
+          "value": true
+        },
+        "output": true
+      },
+      {
+        "name": "scope",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "scope",
+          "value": "{{national_scope_count > 0 ? 'national' : 'district'}}"
+        },
+        "output": true
+      }
+    ]
+  }
+}

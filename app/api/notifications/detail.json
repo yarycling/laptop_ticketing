@@ -1,0 +1,406 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "notifications.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid notification is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "own_row",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_notification_inbox",
+            "columns": [
+              {
+                "column": "recipient_id"
+              },
+              {
+                "column": "notification_event_id"
+              },
+              {
+                "column": "user_id"
+              },
+              {
+                "column": "event_type_code"
+              },
+              {
+                "column": "event_type_name"
+              },
+              {
+                "column": "source_type"
+              },
+              {
+                "column": "source_id"
+              },
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "ticket_number"
+              },
+              { "column": "origin_school_id" },
+              { "column": "school_name" },
+              { "column": "origin_district_id" },
+              { "column": "district_name" },
+              { "column": "serial_number" },
+              { "column": "asset_tag" },
+              {
+                "column": "sla_instance_id"
+              },
+              {
+                "column": "escalation_case_id"
+              },
+              {
+                "column": "logistics_case_id"
+              },
+              { "column": "logistics_number" },
+              { "column": "handoff_type" },
+              {
+                "column": "repair_job_id"
+              },
+              { "column": "repair_centre_location_id" },
+              { "column": "repair_centre_name" },
+              {
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "column": "permanent_replacement_case_id"
+              },
+              {
+                "column": "severity_code"
+              },
+              {
+                "column": "severity_name"
+              },
+              {
+                "column": "title"
+              },
+              {
+                "column": "message"
+              },
+              {
+                "column": "action_type"
+              },
+              {
+                "column": "action_reference"
+              },
+              {
+                "column": "created_at"
+              },
+              {
+                "column": "created_at_display"
+              },
+              {
+                "column": "created_by_name"
+              },
+              {
+                "column": "read_at"
+              },
+              {
+                "column": "sla_policy_code"
+              },
+              {
+                "column": "escalation_number"
+              },
+              {
+                "column": "escalation_level"
+              },
+              {
+                "column": "escalation_state_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "recipient_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                },
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{own_row.recipient_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "notification": "{{own_row}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "manage_permission",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_effective_permissions",
+            "columns": [
+              {
+                "column": "permission_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "permission_name"
+                  },
+                  "operation": "=",
+                  "value": "notifications.manage"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!manage_permission.permission_name && permission.bypass != 'SUPER_ADMIN'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Notification was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "admin_row",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_notification_inbox",
+            "columns": [
+              {
+                "column": "recipient_id"
+              },
+              {
+                "column": "notification_event_id"
+              },
+              {
+                "column": "user_id"
+              },
+              {
+                "column": "event_type_code"
+              },
+              {
+                "column": "event_type_name"
+              },
+              {
+                "column": "source_type"
+              },
+              {
+                "column": "source_id"
+              },
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "ticket_number"
+              },
+              {
+                "column": "severity_code"
+              },
+              {
+                "column": "severity_name"
+              },
+              {
+                "column": "title"
+              },
+              {
+                "column": "message"
+              },
+              {
+                "column": "created_at"
+              },
+              {
+                "column": "created_at_display"
+              },
+              {
+                "column": "created_by_name"
+              },
+              {
+                "column": "read_at"
+              },
+              {
+                "column": "sla_policy_code"
+              },
+              {
+                "column": "escalation_number"
+              },
+              {
+                "column": "escalation_level"
+              },
+              {
+                "column": "escalation_state_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "recipient_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!admin_row.recipient_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Notification was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "notification": "{{admin_row}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Notification could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,250 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "manufacturer_id",
+        "type": "number"
+      },
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "models",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "device_models",
+              "alias": "m"
+            },
+            "columns": [
+              {
+                "table": "m",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "m",
+                "column": "manufacturer_id",
+                "alias": "manufacturer_id"
+              },
+              {
+                "table": "mf",
+                "column": "manufacturer_code",
+                "alias": "manufacturer_code"
+              },
+              {
+                "table": "mf",
+                "column": "name",
+                "alias": "manufacturer_name"
+              },
+              {
+                "table": "m",
+                "column": "model_code",
+                "alias": "model_code"
+              },
+              {
+                "table": "m",
+                "column": "model_name",
+                "alias": "model_name"
+              },
+              {
+                "table": "m",
+                "column": "status",
+                "alias": "status"
+              },
+              {
+                "table": "m",
+                "column": "created_at",
+                "alias": "created_at"
+              },
+              {
+                "table": "m",
+                "column": "updated_at",
+                "alias": "updated_at"
+              },
+              {
+                "table": "m",
+                "column": "image_available",
+                "alias": "image_available"
+              }
+            ],
+            "joins": [
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.manufacturer_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.manufacturer_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "m",
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "m",
+                        "column": "model_code"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "m",
+                        "column": "model_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "mf",
+                        "column": "name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "mf",
+                "column": "name",
+                "direction": "asc"
+              },
+              {
+                "table": "m",
+                "column": "model_name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "models": "{{models}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "password_email_issue",
+          "params": {
+            "user_id": "{{$_PARAM.user_id}}",
+            "actor_id": "{{$_PARAM.actor_id}}",
+            "purpose": "{{$_PARAM.purpose}}"
+          }
+        },
+        "name": "delivery"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "sent",
+          "value": "{{delivery.sent}}"
+        },
+        "name": "sent",
+        "output": true
+      }
+    ]
+  },
+  "meta": {
+    "$_PARAM": [
+      {
+        "name": "user_id",
+        "type": "text"
+      },
+      {
+        "name": "actor_id",
+        "type": "text"
+      },
+      {
+        "name": "purpose",
+        "type": "text"
+      }
+    ]
+  }
+}

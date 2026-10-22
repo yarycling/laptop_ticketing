@@ -1,0 +1,150 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "text",
+        "name": "search"
+      },
+      {
+        "type": "number",
+        "name": "district_id"
+      },
+      {
+        "type": "text",
+        "name": "status"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "schools.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "schools",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "s",
+                "column": "school_code",
+                "alias": "school_code"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "name"
+              },
+              {
+                "table": "s",
+                "column": "district_id",
+                "alias": "district_id"
+              },
+              {
+                "table": "d",
+                "column": "name",
+                "alias": "district_name"
+              },
+              {
+                "table": "s",
+                "column": "status",
+                "alias": "status"
+              },
+              {
+                "table": "s",
+                "column": "created_at",
+                "alias": "created_at"
+              },
+              {
+                "table": "s",
+                "column": "updated_at",
+                "alias": "updated_at"
+              }
+            ],
+            "joins": [
+              {
+                "table": "districts",
+                "alias": "d",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "s",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "orders": [
+              {
+                "table": "s",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "schools": "{{schools}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

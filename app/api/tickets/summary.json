@@ -1,0 +1,1106 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "tickets.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "open_total",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "tickets",
+              "alias": "t"
+            },
+            "columns": [
+              {
+                "table": "t",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "current_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "is_terminal"
+                  },
+                  "operation": "=",
+                  "value": 0
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "submitted",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "tickets",
+              "alias": "t"
+            },
+            "columns": [
+              {
+                "table": "t",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "current_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "SUBMITTED"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "needs_clarification",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "tickets",
+              "alias": "t"
+            },
+            "columns": [
+              {
+                "table": "t",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "current_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "NEEDS_CLARIFICATION"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "approved_for_pickup",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "tickets",
+              "alias": "t"
+            },
+            "columns": [
+              {
+                "table": "t",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "current_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "APPROVED_FOR_PICKUP"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "t",
+                        "column": "id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "unassigned_open",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_ticket_current_context",
+              "alias": "v"
+            },
+            "columns": [
+              {
+                "table": "v",
+                "column": "ticket_id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "code",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "current_status_code"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "is_terminal"
+                  },
+                  "operation": "=",
+                  "value": 0
+                },
+                {
+                  "data": {
+                    "table": "v",
+                    "column": "active_assignment_id"
+                  },
+                  "operator": "is_null"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "assigned_open",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_ticket_current_context",
+              "alias": "v"
+            },
+            "columns": [
+              {
+                "table": "v",
+                "column": "ticket_id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "code",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "current_status_code"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "is_terminal"
+                  },
+                  "operation": "=",
+                  "value": 0
+                },
+                {
+                  "data": {
+                    "table": "v",
+                    "column": "active_assignment_id"
+                  },
+                  "operator": "is_not_null"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "my_open",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_ticket_current_context",
+              "alias": "v"
+            },
+            "columns": [
+              {
+                "table": "v",
+                "column": "ticket_id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "code",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "current_status_code"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_repair_current_context",
+                "alias": "rctx",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "rctx",
+                      "column": "ticket_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ts",
+                    "column": "is_terminal"
+                  },
+                  "operation": "=",
+                  "value": 0
+                },
+                {
+                  "data": {
+                    "table": "v",
+                    "column": "assigned_to_user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": ">",
+                      "value": 0
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.districts.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "origin_school_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.schools.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "rctx",
+                        "column": "repair_centre_location_id"
+                      },
+                      "operation": "in",
+                      "value": "{{scope_context.service_locations.flatten('id')}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0 && scope_context.service_locations.length == 0}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "v",
+                        "column": "ticket_id"
+                      },
+                      "operation": "=",
+                      "value": -1
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "summary": {
+              "open_total": "{{open_total}}",
+              "submitted": "{{submitted}}",
+              "needs_clarification": "{{needs_clarification}}",
+              "approved_for_pickup": "{{approved_for_pickup}}",
+              "unassigned_open": "{{unassigned_open}}",
+              "assigned_open": "{{assigned_open}}",
+              "my_open": "{{my_open}}"
+            }
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "Ticket summary could not be loaded."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

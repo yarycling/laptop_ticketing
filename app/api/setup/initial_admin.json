@@ -1,0 +1,376 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "count_users",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users"
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{count_users > 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Initial administrator has already been created."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "username",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "username",
+          "value": "{{$_POST.username.trim()}}"
+        }
+      },
+      {
+        "name": "email",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "email",
+          "value": "{{$_POST.email.trim().lowercase()}}"
+        }
+      },
+      {
+        "name": "first_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "first_name",
+          "value": "{{$_POST.first_name.trim()}}"
+        }
+      },
+      {
+        "name": "last_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "last_name",
+          "value": "{{$_POST.last_name.trim()}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!username || !email || !email.contains('@') || !first_name || !last_name || !$_POST.password || $_POST.password.length() < 10 || $_POST.password != ($_POST.confirm_password ? $_POST.confirm_password : $_POST.password_confirm)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Initial administrator details are invalid."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "duplicate_user",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "OR",
+              "rules": [
+                {
+                  "data": {
+                    "column": "username"
+                  },
+                  "operation": "=",
+                  "value": "{{username}}"
+                },
+                {
+                  "data": {
+                    "column": "email"
+                  },
+                  "operation": "=",
+                  "value": "{{email}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{duplicate_user.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Username or email already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "super_admin_role",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "roles",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "SUPER_ADMIN"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!super_admin_role.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 500,
+                  "data": {
+                    "success": false,
+                    "error": "Initial administrator setup is not available."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "password_hash",
+        "module": "crypto",
+        "action": "passwordHash",
+        "options": {
+          "password": "{{$_POST.password}}",
+          "algo": "argon2id"
+        }
+      },
+      {
+        "name": "initial_admin_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "create_user",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "users",
+                    "values": [
+                      {
+                        "column": "username",
+                        "value": "{{username}}"
+                      },
+                      {
+                        "column": "email",
+                        "value": "{{email}}"
+                      },
+                      {
+                        "column": "password_hash",
+                        "value": "{{password_hash}}"
+                      },
+                      {
+                        "column": "first_name",
+                        "value": "{{first_name}}"
+                      },
+                      {
+                        "column": "last_name",
+                        "value": "{{last_name}}"
+                      },
+                      {
+                        "column": "display_name",
+                        "value": "{{first_name + ' ' + last_name}}"
+                      },
+                      {
+                        "column": "status",
+                        "value": "active"
+                      },
+                      {
+                        "column": "password_changed_at",
+                        "value": "{{NOW}}"
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      },
+                      {
+                        "column": "updated_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "assign_super_admin",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_roles",
+                    "values": [
+                      {
+                        "column": "user_id",
+                        "value": "{{create_user.identity}}"
+                      },
+                      {
+                        "column": "role_id",
+                        "value": "{{super_admin_role.id}}"
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit_initial_admin",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{create_user.identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "initial_admin_created"
+                      },
+                      {
+                        "column": "module",
+                        "value": "security"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "user"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{create_user.identity}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Initial Super Administrator created."
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 201,
+          "data": {
+            "success": true,
+            "user_id": "{{create_user.identity}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "Initial administrator setup failed."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

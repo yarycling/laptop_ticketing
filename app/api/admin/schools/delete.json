@@ -1,0 +1,285 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "school_id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "schools.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.school_id || $_POST.school_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose a valid school."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "name"
+              },
+              {
+                "table": "s",
+                "column": "district_id",
+                "alias": "district_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.school_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "School was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_access",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_authorized_schools",
+          "params": {
+            "super_admin": "{{require_permission.bypass == 'SUPER_ADMIN'}}"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school_access.allowed_schools.flatten('id').contains(school.id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{school.district_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Only schools with no district can be deleted."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "delete_school_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "delete_school",
+                "module": "dbupdater",
+                "action": "delete",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "schools",
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{school.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "audit_school_deleted",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "school.deleted"
+                      },
+                      {
+                        "column": "module",
+                        "value": "organisation"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "school"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{school.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "School deleted: {{school.name}}"
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "school_id": "{{school.id}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 409,
+          "data": {
+            "success": false,
+            "error": "The school is referenced by retained records and cannot be deleted."
+          }
+        }
+      }
+    ]
+  }
+}

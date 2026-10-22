@@ -1,0 +1,147 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "users.update"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "email"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.user_id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "target"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!target.id || target.status != 'active' || !target.email}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Select an active user with a valid email address."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "user_admin_send_email",
+          "params": {
+            "user_id": "{{target.id}}",
+            "actor_id": "{{identity}}",
+            "purpose": "ACCOUNT_SETUP"
+          }
+        },
+        "name": "delivery"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "email_sent": "{{delivery.sent}}",
+            "message": "{{delivery.sent ? 'Email sent.' : 'Email could not be sent. Please retry.'}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "user_id",
+        "type": "text"
+      }
+    ]
+  }
+}

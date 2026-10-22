@@ -1,0 +1,543 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "manufacturer_return_case_id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "manufacturer_returns.manufacturer_acknowledge"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "name": "ack_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "manufacturer_return_cases",
+                      "alias": "m"
+                    },
+                    "columns": [
+                      {
+                        "table": "m",
+                        "column": "id"
+                      },
+                      {
+                        "table": "m",
+                        "column": "current_status_code"
+                      },
+                      {
+                        "table": "m",
+                        "column": "repair_centre_location_id"
+                      },
+                      {
+                        "table": "m",
+                        "column": "original_device_id"
+                      },
+                      {
+                        "table": "s",
+                        "column": "carrier_pickup_at"
+                      },
+                      {
+                        "table": "s",
+                        "column": "destination_received_at"
+                      },
+                      {
+                        "table": "c",
+                        "column": "carrier_type"
+                      },
+                      {
+                        "table": "ls",
+                        "column": "code",
+                        "alias": "lifecycle_code"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "manufacturer_return_shipments",
+                        "alias": "s",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "s",
+                              "column": "manufacturer_return_case_id",
+                              "operation": "=",
+                              "value": {
+                                "table": "m",
+                                "column": "id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "carriers",
+                        "alias": "c",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "c",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "s",
+                                "column": "carrier_id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "devices",
+                        "alias": "d",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "d",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "m",
+                                "column": "original_device_id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "device_lifecycle_statuses",
+                        "alias": "ls",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "ls",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "d",
+                                "column": "lifecycle_status_id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "m",
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.manufacturer_return_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "m",
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        },
+                        {
+                          "data": {
+                            "table": "s",
+                            "column": "direction"
+                          },
+                          "operation": "=",
+                          "value": "OUTBOUND"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "location_scope",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_service_location_scopes",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "service_location_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.repair_centre_location_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.id || (permission.bypass != 'SUPER_ADMIN' && !location_scope.id)}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8B_ACK_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{current.current_status_code != 'OUTBOUND_IN_TRANSIT' || current.carrier_type == null || !current.carrier_pickup_at || current.destination_received_at || current.lifecycle_code != 'MANUFACTURER_RETURN'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8B_ACK_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "received",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_shipments",
+                    "values": [
+                      {
+                        "column": "destination_received_at",
+                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.v')}}"
+                      },
+                      {
+                        "column": "destination_received_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "manufacturer_return_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "direction"
+                          },
+                          "operation": "=",
+                          "value": "OUTBOUND"
+                        },
+                        {
+                          "data": {
+                            "column": "carrier_pickup_at"
+                          },
+                          "operator": "is_not_null"
+                        },
+                        {
+                          "data": {
+                            "column": "destination_received_at"
+                          },
+                          "operator": "is_null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "case_update",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_cases",
+                    "values": [
+                      {
+                        "column": "current_status_code",
+                        "value": "AT_MANUFACTURER"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "OUTBOUND_IN_TRANSIT"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{received.affected != 1 || case_update.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8B_ACK_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_status_history",
+                    "values": [
+                      {
+                        "column": "manufacturer_return_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": "OUTBOUND_IN_TRANSIT"
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "AT_MANUFACTURER"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "Repair Centre recorded manufacturer acknowledgement."
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "manufacturer_acknowledged"
+                      },
+                      {
+                        "column": "module",
+                        "value": "manufacturer_returns"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "manufacturer_return_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Repair Centre recorded acknowledgement of manufacturer receipt."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "status": "AT_MANUFACTURER",
+            "recorded_by": "Repair Centre"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8B_ACK_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8B_ACK_STATE' || $_EXCEPTION.code == 'ER_DUP_ENTRY'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Manufacturer acknowledgement is not valid for the current shipment state."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Manufacturer acknowledgement could not be recorded."
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid device ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "device",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "devices",
+              "alias": "dv"
+            },
+            "joins": [
+              {
+                "table": "device_models",
+                "alias": "m",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "m",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "device_model_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_device_current_custody",
+                "alias": "cc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "cc",
+                      "column": "device_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "columns": [
+              {
+                "table": "dv",
+                "column": "id"
+              },
+              {
+                "table": "m",
+                "column": "image_path"
+              },
+              {
+                "table": "cc",
+                "column": "district_id"
+              },
+              {
+                "table": "cc",
+                "column": "school_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "dv",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!device.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Device image was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(device.district_id) && !scope_context.schools.flatten('id').contains(device.school_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!device.image_path}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "No image is available for this device."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "fs",
+        "action": "download",
+        "options": {
+          "path": "{{device.image_path}}"
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "The device image could not be loaded."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

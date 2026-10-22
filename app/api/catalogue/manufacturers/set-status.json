@@ -1,0 +1,333 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "id",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.id || $_POST.id < 1 || ($_POST.status != 'active' && $_POST.status != 'inactive')}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Valid ID and status are required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "manufacturer",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturers",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!manufacturer.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Manufacturer was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{manufacturer.status == $_POST.status}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "unchanged": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.status == 'inactive'}}",
+          "then": {
+            "steps": [
+              {
+                "name": "active_models",
+                "module": "dbconnector",
+                "action": "count",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "device_models",
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "manufacturer_id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{active_models > 0}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 409,
+                          "data": {
+                            "success": false,
+                            "error": "Deactivate the manufacturer's active device models first."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "change_manufacturer_status",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "update_manufacturer",
+                "module": "dbupdater",
+                "action": "update",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturers",
+                    "values": [
+                      {
+                        "column": "status",
+                        "value": "{{$_POST.status}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "audit_manufacturer_status",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "{{$_POST.status == 'active' ? 'manufacturer_activated' : 'manufacturer_deactivated'}}"
+                      },
+                      {
+                        "column": "module",
+                        "value": "device_catalogue"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "manufacturer"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{$_POST.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Manufacturer status changed."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="x-apple-disable-message-reformatting">
+  <title>Set your password</title>
+</head>
+<body style="margin:0;padding:32px 12px;background-color:#f2f6f9;font-family:Arial,Helvetica,sans-serif;color:#14212d;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+    <tr>
+      <td align="center" style="padding:0;">
+        <table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:680px;border-collapse:separate;border-spacing:0;background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 12px 32px rgba(20,40,56,.10);">
+          <tr>
+            <td height="160" background="{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-wave.png'}}" style="height:160px;padding:18px 26px 0;background-color:#ffffff;background-image:url('{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-wave.png'}}');background-position:right top;background-repeat:no-repeat;background-size:auto 160px;">
+              <table role="presentation" width="100%" height="142" cellpadding="0" cellspacing="0" border="0" style="height:142px;border-collapse:collapse;">
+                <tr>
+                  <td width="48%" valign="middle" style="padding:0 8px 0 0;">
+                    <img src="{{$_ENV.APP_BASE_URL + '/assets/img/brand/bmobile-logo.png'}}" width="190" alt="bmobile" style="display:block;width:190px;max-width:100%;height:auto;border:0;">
+                    <div style="padding:7px 0 0 52px;color:#718096;font-size:11px;font-weight:bold;letter-spacing:3px;">TSTT LAPTOP PORTAL</div>
+                  </td>
+                  <td width="52%" align="right" valign="top" style="padding:12px 12px 0 0;">
+                    <div style="color:#14212d;font-size:9px;font-weight:bold;letter-spacing:1px;white-space:nowrap;">PEOPLE&nbsp;&nbsp;|&nbsp;&nbsp;TECHNOLOGY&nbsp;&nbsp;|&nbsp;&nbsp;A BRIGHTER TOMORROW</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding:16px 36px 0;">
+              <img src="{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-shield-lock.png'}}" width="190" alt="Shield and lock security symbol" style="display:block;width:190px;max-width:100%;height:auto;border:0;margin:0 auto;">
+              <h1 style="margin:24px 0 10px;color:#14212d;font-size:34px;line-height:1.2;font-weight:700;">Set your password</h1>
+              <p style="margin:0 auto;color:#64748b;font-size:17px;line-height:1.55;max-width:470px;">Your account has been created.<br>Username: <strong>{{account.username}}</strong><br>Security Group: <strong>{{account_roles.flatten('label').join(', ')}}</strong><br>Set your password using the button below.</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px auto 0;border-collapse:separate;border-spacing:0;">
+                <tr>
+                  <td align="center" bgcolor="#00a94f" style="border-radius:10px;background-color:#00a94f;">
+                    <a href="{{reset_url}}" style="display:inline-block;padding:16px 56px;color:#ffffff;font-size:18px;font-weight:bold;line-height:1.2;text-decoration:none;">Set Password&nbsp;&nbsp; &#8594;</a>
+                  </td>
+                </tr>
+              </table>
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:16px auto 24px;border-collapse:collapse;">
+                <tr>
+                  <td align="center" valign="middle" style="width:42px;height:42px;"><img src="{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-clock-badge.png'}}" width="42" alt="" style="display:block;width:42px;height:auto;border:0;"></td>
+                  <td valign="middle" style="padding-left:10px;color:#536579;font-size:14px;">This link will expire in <strong style="color:#14212d;">15 minutes.</strong></td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px;">
+              <div style="height:1px;background-color:#dce4eb;font-size:1px;line-height:1px;">&nbsp;</div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 28px 0;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0;background-color:#f7f9fb;border:1px solid #d9e1e9;border-radius:12px;">
+                <tr>
+                  <td valign="top" style="width:58px;padding:18px 0 12px 18px;"><img src="{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-link-badge.png'}}" width="42" alt="" style="display:block;width:42px;height:auto;border:0;"></td>
+                  <td style="padding:18px 18px 12px 12px;">
+                    <strong style="color:#182432;font-size:15px;">If the button does not work</strong>
+                    <div style="padding-top:5px;color:#64748b;font-size:14px;line-height:1.45;">Copy and paste this link into your browser:</div>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding:0 14px 16px;">
+                    <div style="padding:12px 14px;border:1px solid #d8e1e9;border-radius:8px;background-color:#ffffff;color:#0877dc;font-size:13px;line-height:1.5;word-break:break-all;">
+                      <a href="{{reset_url}}" style="color:#0877dc;text-decoration:none;word-break:break-all;">{{reset_url}}</a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 28px 26px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0;background-color:#edf9f3;border-radius:12px;">
+                <tr>
+                  <td valign="top" style="width:78px;padding:20px 0 20px 20px;"><img src="{{$_ENV.APP_BASE_URL + '/assets/img/email/password-reset-shield-badge.png'}}" width="62" alt="Security shield" style="display:block;width:62px;height:auto;border:0;"></td>
+                  <td style="padding:20px 20px 20px 12px;border-left:1px solid #b8e8d0;">
+                    <strong style="color:#008a49;font-size:15px;">Didn’t request this change?</strong>
+                    <div style="padding-top:5px;color:#64748b;font-size:14px;line-height:1.55;">If you did not request this change, you can safely ignore this email and contact your administrator or support team. The portal team will never ask you to share your password.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

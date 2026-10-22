@@ -1,0 +1,14 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": { "permission": "logistics.locations_manage" }
+        }
+      }
+    ]
+  }
+}

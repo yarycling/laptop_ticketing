@@ -1,0 +1,157 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "roles.view"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_security_groups",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "label"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "scope_type"
+              },
+              {
+                "column": "user_count"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "assignable"
+                  },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "name": "groups"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "role_permissions",
+              "alias": "rp"
+            },
+            "columns": [
+              {
+                "table": "rp",
+                "column": "role_id"
+              },
+              {
+                "table": "p",
+                "column": "name"
+              },
+              {
+                "table": "p",
+                "column": "label"
+              }
+            ],
+            "joins": [
+              {
+                "table": "permissions",
+                "alias": "p",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "p",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "rp",
+                        "column": "permission_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "name": "permissions"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "groups": "{{groups}}",
+            "permissions": "{{permissions}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  }
+}

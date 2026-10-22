@@ -1,0 +1,27 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [
+    { "name": "search", "type": "text" },
+    { "name": "page", "type": "number" },
+    { "name": "page_size", "type": "number" }
+  ] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "device_stock.intake" } } },
+    { "name": "scope_context", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_get_scope_context", "params": {} } },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length == 0}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "name": "page", "module": "core", "action": "setvalue", "output": true, "options": { "key": "page", "value": "{{$_GET.page && $_GET.page > 0 ? floor($_GET.page) : 1}}" } },
+    { "name": "page_size", "module": "core", "action": "setvalue", "output": true, "options": { "key": "page_size", "value": 10 } },
+    { "name": "locations", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "columns": [{ "column": "id" }, { "column": "code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "location_type" }, "operation": "=", "value": "REPAIR_CENTRE" }, { "data": { "column": "is_active" }, "operation": "=", "value": 1 }, { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN'}}", "rules": [{ "data": { "column": "id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] }] }, "orders": [{ "column": "name", "direction": "asc" }] } } },
+    { "name": "filtered_count", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "v_device_stock_intake_eligibility", "alias": "e" }, "wheres": { "condition": "AND", "rules": [
+      { "data": { "table": "e", "column": "lifecycle_code" }, "operation": "=", "value": "AVAILABLE" }, { "data": { "table": "e", "column": "allocation_level" }, "operation": "!=", "value": "STUDENT" },
+      { "data": { "table": "e", "column": "has_active_stock" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_logistics" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_manufacturer_return" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_repair" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_replacement_reservation" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_replacement_consumption" }, "operation": "=", "value": 0 },
+      { "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [{ "data": { "table": "e", "column": "serial_number" }, "operator": "contains", "value": "{{$_GET.search}}" }, { "data": { "table": "e", "column": "asset_tag" }, "operator": "contains", "value": "{{$_GET.search}}" }] }
+    ] } } } },
+    { "name": "devices", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "v_device_stock_intake_eligibility", "alias": "e" }, "columns": [{ "table": "e", "column": "device_id" }, { "table": "e", "column": "serial_number" }, { "table": "e", "column": "asset_tag" }, { "table": "e", "column": "manufacturer_name" }, { "table": "e", "column": "model_name" }, { "table": "e", "column": "lifecycle_code" }, { "table": "e", "column": "allocation_level" }], "wheres": { "condition": "AND", "rules": [
+      { "data": { "table": "e", "column": "lifecycle_code" }, "operation": "=", "value": "AVAILABLE" }, { "data": { "table": "e", "column": "allocation_level" }, "operation": "!=", "value": "STUDENT" },
+      { "data": { "table": "e", "column": "has_active_stock" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_logistics" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_manufacturer_return" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_active_repair" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_replacement_reservation" }, "operation": "=", "value": 0 }, { "data": { "table": "e", "column": "has_replacement_consumption" }, "operation": "=", "value": 0 },
+      { "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [{ "data": { "table": "e", "column": "serial_number" }, "operator": "contains", "value": "{{$_GET.search}}" }, { "data": { "table": "e", "column": "asset_tag" }, "operator": "contains", "value": "{{$_GET.search}}" }] }
+    ] }, "orders": [{ "table": "e", "column": "device_id", "direction": "desc" }], "limit": "{{page_size}}", "offset": "{{(page - 1) * page_size}}" } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "locations": "{{locations}}", "devices": "{{devices}}", "page": "{{page}}", "page_size": "{{page_size}}", "total": "{{filtered_count}}", "total_pages": "{{ceil(filtered_count / page_size)}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Stock intake options could not be loaded." } } }] }
+}

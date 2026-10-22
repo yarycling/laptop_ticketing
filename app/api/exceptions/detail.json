@@ -1,0 +1,884 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "exceptions.view"
+          }
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.service_locations.length == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid exception case ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "repair_exception_cases",
+              "alias": "ec"
+            },
+            "columns": [
+              {
+                "table": "ec",
+                "column": "id",
+                "alias": "exception_case_id"
+              },
+              {
+                "table": "ec",
+                "column": "ticket_id"
+              },
+              {
+                "table": "t",
+                "column": "ticket_number"
+              },
+              {
+                "table": "t",
+                "column": "origin_district_id"
+              },
+              {
+                "table": "dist",
+                "column": "name",
+                "alias": "district_name"
+              },
+              {
+                "table": "t",
+                "column": "origin_school_id"
+              },
+              {
+                "table": "school",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "ec",
+                "column": "logistics_case_id"
+              },
+              {
+                "table": "lc",
+                "column": "logistics_number"
+              },
+              {
+                "table": "ec",
+                "column": "repair_job_id"
+              },
+              {
+                "table": "ec",
+                "column": "device_id"
+              },
+              {
+                "table": "d",
+                "column": "serial_number"
+              },
+              {
+                "table": "out",
+                "column": "code",
+                "alias": "originating_outcome_code"
+              },
+              {
+                "table": "ec",
+                "column": "current_status_code"
+              },
+              {
+                "table": "ec",
+                "column": "recommended_disposition_code"
+              },
+              {
+                "table": "job",
+                "column": "repair_centre_location_id"
+              },
+              {
+                "table": "loc",
+                "column": "name",
+                "alias": "repair_centre_name"
+              },
+              {
+                "table": "ctx",
+                "column": "ticket_current_status_code",
+                "alias": "ticket_status_code"
+              },
+              {
+                "table": "ctx",
+                "column": "current_logistics_status_code",
+                "alias": "logistics_status_code"
+              },
+              {
+                "table": "pc",
+                "column": "physical_state_code"
+              },
+              {
+                "table": "life",
+                "column": "code",
+                "alias": "device_lifecycle_code"
+              },
+              {
+                "table": "ec",
+                "column": "created_at"
+              },
+              {
+                "table": "ec",
+                "column": "updated_at"
+              }
+            ],
+            "joins": [
+              {
+                "table": "tickets",
+                "alias": "t",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "t",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "ticket_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "districts",
+                "alias": "dist",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "dist",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "origin_district_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "school",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "school",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "ticket_logistics_cases",
+                "alias": "lc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "lc",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "devices",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "device_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "device_lifecycle_statuses",
+                "alias": "life",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [{ "table": "life", "column": "id", "operation": "=", "value": { "table": "d", "column": "lifecycle_status_id" } }]
+                }
+              },
+              {
+                "table": "repair_outcomes",
+                "alias": "out",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "out",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "originating_repair_outcome_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "repair_jobs",
+                "alias": "job",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "job",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "repair_job_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "service_locations",
+                "alias": "loc",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "loc",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "job",
+                        "column": "repair_centre_location_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_logistics_case_detail_context",
+                "alias": "ctx",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ctx",
+                      "column": "logistics_case_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ec",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_logistics_physical_custody",
+                "alias": "pc",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [{ "table": "pc", "column": "logistics_case_id", "operation": "=", "value": { "table": "ec", "column": "logistics_case_id" } }]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ec",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN'}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "ec",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "ec",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "t",
+                            "column": "origin_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "job",
+                            "column": "repair_centre_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!case.exception_case_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Exception case was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "assessments",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "exception_financial_assessments",
+              "alias": "a"
+            },
+            "columns": [
+              {
+                "table": "a",
+                "column": "id"
+              },
+              {
+                "table": "a",
+                "column": "warranty_decision_code"
+              },
+              {
+                "table": "a",
+                "column": "warranty_rejection_reason"
+              },
+              {
+                "table": "a",
+                "column": "responsibility_party_code"
+              },
+              {
+                "table": "a",
+                "column": "negligence_determination_code"
+              },
+              {
+                "table": "a",
+                "column": "estimated_cost"
+              },
+              {
+                "table": "a",
+                "column": "approved_charge_amount"
+              },
+              {
+                "table": "a",
+                "column": "actual_cost"
+              },
+              {
+                "table": "a",
+                "column": "financial_status_code"
+              },
+              {
+                "table": "a",
+                "column": "reference"
+              },
+              {
+                "table": "a",
+                "column": "notes"
+              },
+              {
+                "table": "a",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "created_by"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "created_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "a",
+                    "column": "exception_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.exception_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "a",
+                "column": "created_at",
+                "direction": "desc"
+              },
+              {
+                "table": "a",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "decisions",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "exception_decisions",
+              "alias": "ed"
+            },
+            "columns": [
+              {
+                "table": "ed",
+                "column": "id"
+              },
+              {
+                "table": "ed",
+                "column": "decision_type_code"
+              },
+              {
+                "table": "ed",
+                "column": "selected_disposition_code"
+              },
+              {
+                "table": "ed",
+                "column": "decision_code"
+              },
+              {
+                "table": "ed",
+                "column": "reason"
+              },
+              {
+                "table": "ed",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ed",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ed",
+                    "column": "exception_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.exception_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "ed",
+                "column": "created_at",
+                "direction": "desc"
+              },
+              {
+                "table": "ed",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "exception_case_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "id"
+              },
+              {
+                "table": "h",
+                "column": "from_status_code"
+              },
+              {
+                "table": "h",
+                "column": "to_status_code"
+              },
+              {
+                "table": "h",
+                "column": "reason"
+              },
+              {
+                "table": "h",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "exception_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.exception_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "created_at",
+                "direction": "desc"
+              },
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_assessments",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{assessments}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "recorded_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "recorded_at_display",
+                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_decisions",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{decisions}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "recorded_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "recorded_at_display",
+                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_history",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{history}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "recorded_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "recorded_at_display",
+                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "case": "{{case}}",
+            "assessments": "{{display_assessments}}",
+            "decisions": "{{display_decisions}}",
+            "status_history": "{{display_history}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Exception case could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,2031 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "tickets.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid ticket ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "ticket",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "tickets",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "ticket_number"
+              },
+              {
+                "column": "device_id"
+              },
+              {
+                "column": "origin_district_id"
+              },
+              {
+                "column": "origin_school_id"
+              },
+              {
+                "column": "origin_student_id"
+              },
+              {
+                "column": "requester_type"
+              },
+              {
+                "column": "requester_name"
+              },
+              {
+                "column": "requester_email"
+              },
+              {
+                "column": "requester_phone"
+              },
+              {
+                "column": "subject"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "current_status_id"
+              },
+              {
+                "column": "created_by_user_id"
+              },
+              {
+                "column": "submitted_at"
+              },
+              {
+                "column": "closed_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            },
+            "limit": 1
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{ticket.count() == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Ticket was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repair_scope",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_logistics_case_detail_context",
+            "columns": [
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "repair_centre_location_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(ticket.first().origin_district_id) && !scope_context.schools.flatten('id').contains(ticket.first().origin_school_id) && !scope_context.service_locations.flatten('id').contains(repair_scope.repair_centre_location_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "device",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "devices",
+              "alias": "dv"
+            },
+            "columns": [
+              {
+                "table": "dv",
+                "column": "id",
+                "alias": "device_id"
+              },
+              {
+                "table": "dv",
+                "column": "serial_number"
+              },
+              {
+                "table": "dv",
+                "column": "asset_tag"
+              },
+              {
+                "table": "mf",
+                "column": "name",
+                "alias": "manufacturer_name"
+              },
+              {
+                "table": "m",
+                "column": "model_name"
+              },
+              {
+                "table": "ls",
+                "column": "code",
+                "alias": "lifecycle_code"
+              },
+              {
+                "table": "ls",
+                "column": "name",
+                "alias": "lifecycle_name"
+              },
+              {
+                "table": "cc",
+                "column": "current_custody_level"
+              },
+              {
+                "table": "cc",
+                "column": "district_id",
+                "alias": "current_district_id"
+              },
+              {
+                "table": "cd",
+                "column": "name",
+                "alias": "current_district_name"
+              },
+              {
+                "table": "cc",
+                "column": "school_id",
+                "alias": "current_school_id"
+              },
+              {
+                "table": "cs",
+                "column": "name",
+                "alias": "current_school_name"
+              },
+              {
+                "table": "cc",
+                "column": "student_id",
+                "alias": "current_student_id"
+              },
+              {
+                "table": "cst",
+                "column": "student_reference",
+                "alias": "current_student_reference"
+              }
+            ],
+            "joins": [
+              {
+                "table": "device_models",
+                "alias": "m",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "m",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "device_model_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "device_lifecycle_statuses",
+                "alias": "ls",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ls",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "lifecycle_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_device_current_custody",
+                "alias": "cc",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "cc",
+                      "column": "device_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "districts",
+                "alias": "cd",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "cd",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "cc",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "cs",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "cs",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "cc",
+                        "column": "school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "students",
+                "alias": "cst",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "cst",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "cc",
+                        "column": "student_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "dv",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().device_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "origin",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "school_id"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "d",
+                "column": "id",
+                "alias": "district_id"
+              },
+              {
+                "table": "d",
+                "column": "name",
+                "alias": "district_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "districts",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "s",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().origin_school_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "origin_student",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "students",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "student_reference"
+              },
+              {
+                "column": "first_name"
+              },
+              {
+                "column": "last_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().origin_student_id || -1}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "current_status",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "ticket_statuses",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "code"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "is_terminal"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().current_status_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "created_by",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "display_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().created_by_user_id || -1}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "status_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "id"
+              },
+              {
+                "table": "fs",
+                "column": "name",
+                "alias": "from_status_name"
+              },
+              {
+                "table": "ts",
+                "column": "name",
+                "alias": "to_status_name"
+              },
+              {
+                "table": "h",
+                "column": "changed_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "changed_by_display_name"
+              },
+              {
+                "table": "h",
+                "column": "reason"
+              },
+              {
+                "table": "h",
+                "column": "comment"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_statuses",
+                "alias": "fs",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "fs",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "from_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "ticket_statuses",
+                "alias": "ts",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ts",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "changed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "changed_at",
+                "direction": "asc"
+              },
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "diagnoses",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_diagnoses",
+              "alias": "td"
+            },
+            "columns": [
+              {
+                "table": "td",
+                "column": "id",
+                "alias": "diagnosis_id"
+              },
+              {
+                "table": "td",
+                "column": "diagnosis_summary"
+              },
+              {
+                "table": "td",
+                "column": "recommended_action"
+              },
+              {
+                "table": "td",
+                "column": "diagnosed_at"
+              },
+              {
+                "table": "td",
+                "column": "diagnosed_by_user_id"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "diagnosed_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "td",
+                        "column": "diagnosed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "td",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "td",
+                "column": "diagnosed_at",
+                "direction": "desc"
+              },
+              {
+                "table": "td",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_diagnoses",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{diagnoses}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "diagnosed_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "diagnosed_at_display",
+                  "value": "{{diagnosed_at ? diagnosed_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "clarification_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_comments",
+              "alias": "c"
+            },
+            "columns": [
+              {
+                "table": "c",
+                "column": "id",
+                "alias": "comment_id"
+              },
+              {
+                "table": "c",
+                "column": "comment_type"
+              },
+              {
+                "table": "c",
+                "column": "comment_text"
+              },
+              {
+                "table": "c",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "created_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "c",
+                        "column": "created_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "c",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "c",
+                        "column": "comment_type"
+                      },
+                      "operation": "=",
+                      "value": "CLARIFICATION_REQUEST"
+                    },
+                    {
+                      "data": {
+                        "table": "c",
+                        "column": "comment_type"
+                      },
+                      "operation": "=",
+                      "value": "CLARIFICATION_RESPONSE"
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "c",
+                "column": "created_at",
+                "direction": "asc"
+              },
+              {
+                "table": "c",
+                "column": "id",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "latest_clarification_request",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "ticket_comments",
+            "columns": [
+              { "column": "comment_text" },
+              { "column": "created_at" }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                { "data": { "column": "ticket_id" }, "operation": "=", "value": "{{ticket.first().id}}" },
+                { "data": { "column": "comment_type" }, "operation": "=", "value": "CLARIFICATION_REQUEST" }
+              ]
+            },
+            "orders": [
+              { "column": "created_at", "direction": "desc" },
+              { "column": "id", "direction": "desc" }
+            ]
+          }
+        }
+      },
+      {
+        "name": "district_approval_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_district_approvals",
+              "alias": "a"
+            },
+            "columns": [
+              {
+                "table": "a",
+                "column": "id",
+                "alias": "approval_id"
+              },
+              {
+                "table": "a",
+                "column": "decision"
+              },
+              {
+                "table": "a",
+                "column": "decision_note"
+              },
+              {
+                "table": "a",
+                "column": "decided_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "decided_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "decided_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "a",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "a",
+                "column": "decided_at",
+                "direction": "desc"
+              },
+              {
+                "table": "a",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "current_assignment",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_assignments",
+              "alias": "ta"
+            },
+            "columns": [
+              {
+                "table": "ta",
+                "column": "id",
+                "alias": "assignment_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_to_user_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_by_user_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_at"
+              },
+              {
+                "table": "assignee",
+                "column": "display_name",
+                "alias": "assigned_to_display_name"
+              },
+              {
+                "table": "assigner",
+                "column": "display_name",
+                "alias": "assigned_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "assignee",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "assignee",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ta",
+                        "column": "assigned_to_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "assigner",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "assigner",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ta",
+                        "column": "assigned_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ta",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                },
+                {
+                  "data": {
+                    "table": "ta",
+                    "column": "active_record_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "table": "ta",
+                    "column": "ended_at"
+                  },
+                  "operator": "is_null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "assignment_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "ticket_assignments",
+              "alias": "ta"
+            },
+            "columns": [
+              {
+                "table": "ta",
+                "column": "id",
+                "alias": "assignment_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_to_user_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_by_user_id"
+              },
+              {
+                "table": "ta",
+                "column": "assigned_at"
+              },
+              {
+                "table": "ta",
+                "column": "ended_at"
+              },
+              {
+                "table": "ta",
+                "column": "ended_by_user_id"
+              },
+              {
+                "table": "ta",
+                "column": "end_reason"
+              },
+              {
+                "table": "ta",
+                "column": "active_record_key"
+              },
+              {
+                "table": "assignee",
+                "column": "display_name",
+                "alias": "assigned_to_display_name"
+              },
+              {
+                "table": "assigner",
+                "column": "display_name",
+                "alias": "assigned_by_display_name"
+              },
+              {
+                "table": "ender",
+                "column": "display_name",
+                "alias": "ended_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "assignee",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "assignee",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ta",
+                        "column": "assigned_to_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "assigner",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "assigner",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ta",
+                        "column": "assigned_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "ender",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ender",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ta",
+                        "column": "ended_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ta",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "ta",
+                "column": "assigned_at",
+                "direction": "desc"
+              },
+              {
+                "table": "ta",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_assignment_history",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{assignment_history}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "assigned_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "assigned_at_display",
+                  "value": "{{assigned_at ? assigned_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              },
+              {
+                "name": "ended_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "ended_at_display",
+                  "value": "{{ended_at ? ended_at.formatDate('MMMM d, yyyy, h:mm A') : 'Current'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "submitted_status",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "ticket_statuses",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "SUBMITTED"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "latest_submitted_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "ticket_status_history",
+            "columns": [
+              {
+                "column": "changed_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                },
+                {
+                  "data": {
+                    "column": "to_status_id"
+                  },
+                  "operation": "=",
+                  "value": "{{submitted_status.id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "changed_at",
+                "direction": "desc"
+              },
+              {
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "has_current_diagnosis",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "has_current_diagnosis",
+          "value": "{{diagnoses.length > 0 && latest_submitted_history.length > 0 && diagnoses.first().diagnosed_at > latest_submitted_history.first().changed_at}}"
+        }
+      },
+      {
+        "name": "active_logistics_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_logistics_case_detail_context",
+              "alias": "lc"
+            },
+            "columns": [
+              {
+                "table": "lc",
+                "column": "logistics_case_id"
+              },
+              {
+                "table": "lc",
+                "column": "logistics_number"
+              },
+              {
+                "table": "lc",
+                "column": "device_id"
+              },
+              {
+                "table": "lc",
+                "column": "serial_number"
+              },
+              {
+                "table": "lc",
+                "column": "original_serial_number"
+              },
+              {
+                "table": "lc",
+                "column": "asset_tag"
+              },
+              {
+                "table": "lc",
+                "column": "device_source"
+              },
+              {
+                "table": "lc",
+                "column": "replacement_case_id"
+              },
+              {
+                "table": "lc",
+                "column": "replacement_number"
+              },
+              {
+                "table": "lc",
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "table": "lc",
+                "column": "device_lifecycle_name"
+              },
+              {
+                "table": "lc",
+                "column": "allocation_custody_level"
+              },
+              {
+                "table": "lc",
+                "column": "current_logistics_status_code"
+              },
+              {
+                "table": "lc",
+                "column": "current_logistics_status_name"
+              },
+              {
+                "table": "lc",
+                "column": "requested_at"
+              },
+              {
+                "table": "lc",
+                "column": "is_active"
+              },
+              {
+                "table": "lc",
+                "column": "returned_physical_state_code",
+                "alias": "return_state_code"
+              },
+              {
+                "table": "p",
+                "column": "physical_state_code"
+              },
+              {
+                "table": "p",
+                "column": "current_service_location_name",
+                "alias": "physical_location_name"
+              },
+              {
+                "table": "p",
+                "column": "ttpost_location_name"
+              },
+              {
+                "table": "p",
+                "column": "repair_centre_location_name",
+                "alias": "repair_centre_name"
+              },
+              {
+                "table": "p",
+                "column": "pending_since",
+                "alias": "handoff_dispatched_at"
+              },
+              {
+                "table": "p",
+                "column": "last_handoff_received_at",
+                "alias": "handoff_received_at"
+              }
+            ],
+            "joins": [
+              {
+                "table": "v_logistics_physical_custody",
+                "alias": "p",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "p",
+                      "column": "logistics_case_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "lc",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "lc",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "lc",
+                "column": "logistics_case_id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "returned_school",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "h",
+                "column": "received_at",
+                "alias": "returned_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "received_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_logistics_cases",
+                "alias": "c",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "c",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "received_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "c",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_TO_SCHOOL"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "received_at"
+                  },
+                  "operator": "is_not_null"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "returned_at_display",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "returned_at_display",
+          "value": "{{returned_school && returned_school.returned_at ? returned_school.returned_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+        },
+        "output": true
+      },
+      {
+        "name": "repair_summary",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_repair_current_context",
+              "alias": "r"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "repair_centre_location_name"
+              },
+              {
+                "table": "r",
+                "column": "repair_state"
+              },
+              {
+                "table": "r",
+                "column": "started_at"
+              },
+              {
+                "table": "r",
+                "column": "completed_at"
+              },
+              {
+                "table": "r",
+                "column": "outcome_name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "exception_summary",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "repair_exception_cases",
+              "alias": "ec"
+            },
+            "columns": [
+              {
+                "table": "ec",
+                "column": "id",
+                "alias": "exception_case_id"
+              },
+              {
+                "table": "ec",
+                "column": "current_status_code"
+              },
+              {
+                "table": "ec",
+                "column": "recommended_disposition_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ec",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "device_logistics_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "ticket_logistics_cases",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "device_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.first().device_id}}"
+                },
+                {
+                  "data": {
+                    "column": "active_record_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "column": "closed_at"
+                  },
+                  "operator": "is_null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "logistics_acceptance",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "changed_at",
+                "alias": "accepted_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "accepted_by_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "logistics_statuses",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "changed_by_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{active_logistics_case.logistics_case_id || -1}}"
+                },
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "ACCEPTED"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "ticket": "{{ticket.first()}}",
+            "device": "{{device}}",
+            "origin": "{{origin}}",
+            "origin_student": "{{origin_student}}",
+            "current_status": "{{current_status}}",
+            "created_by": "{{created_by}}",
+            "status_history": "{{status_history}}",
+            "diagnoses": "{{display_diagnoses}}",
+            "clarification_history": "{{clarification_history}}",
+            "latest_clarification_request": "{{latest_clarification_request}}",
+            "district_approval_history": "{{district_approval_history}}",
+            "current_assignment": "{{current_assignment}}",
+            "assignment_history": "{{display_assignment_history}}",
+            "active_logistics_case": "{{active_logistics_case}}",
+            "returned_school": "{{returned_school}}",
+            "returned_at_display": "{{returned_at_display}}",
+            "repair_summary": "{{repair_summary}}",
+            "exception_summary": "{{exception_summary}}",
+            "device_has_active_logistics_case": "{{device_logistics_case && device_logistics_case.id && active_logistics_case && active_logistics_case.is_active != 1}}",
+            "logistics_accepted_at": "{{logistics_acceptance ? logistics_acceptance.accepted_at : null}}",
+            "logistics_accepted_by": "{{logistics_acceptance ? logistics_acceptance.accepted_by_display_name : null}}",
+            "has_diagnosis": "{{diagnoses.length > 0}}",
+            "has_current_diagnosis": "{{has_current_diagnosis}}",
+            "awaiting_clarification": "{{current_status.code == 'NEEDS_CLARIFICATION'}}",
+            "approved_for_pickup": "{{current_status.code == 'APPROVED_FOR_PICKUP'}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Ticket detail could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

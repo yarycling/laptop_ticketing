@@ -1,0 +1,31 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_super_admin",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ]
+  }
+}

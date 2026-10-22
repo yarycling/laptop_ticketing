@@ -1,0 +1,311 @@
+{
+  "meta": {
+    "$_GET": [
+      {
+        "name": "ticket_id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.ticket_id || $_GET.ticket_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid ticket is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "eligibility",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_temporary_loan_request_context",
+              "alias": "c"
+            },
+            "columns": [
+              {
+                "table": "c",
+                "column": "ticket_id"
+              },
+              {
+                "table": "c",
+                "column": "ticket_number"
+              },
+              {
+                "table": "c",
+                "column": "original_device_id"
+              },
+              {
+                "table": "c",
+                "column": "origin_district_id"
+              },
+              {
+                "table": "c",
+                "column": "origin_school_id"
+              },
+              {
+                "table": "c",
+                "column": "repair_service_location_id"
+              },
+              {
+                "table": "c",
+                "column": "spare_pool_id"
+              },
+              {
+                "table": "c",
+                "column": "can_request"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "c",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.ticket_id}}"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "c",
+                            "column": "ticket_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "c",
+                            "column": "origin_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "c",
+                            "column": "repair_service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!eligibility.ticket_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "summary",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_temporary_loan_queue",
+            "columns": [
+              {
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "column": "loan_number"
+              },
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "original_device_id"
+              },
+              {
+                "column": "current_status_code"
+              },
+              {
+                "column": "loan_status_name"
+              },
+              {
+                "column": "permanent_replacement_number"
+              },
+              {
+                "column": "requested_at"
+              },
+              {
+                "column": "authorized_at"
+              },
+              {
+                "column": "rejected_at"
+              },
+        {
+          "column": "spare_pool_name"
+        },
+        {
+          "column": "selected_spare_serial_number"
+        },
+        {
+          "column": "selected_spare_asset_tag"
+        },
+        {
+          "column": "selected_spare_lifecycle_code"
+        },
+        {
+          "column": "selected_spare_stock_status"
+        },
+        {
+          "column": "physical_custody_code"
+        },
+        {
+          "column": "return_requested_at"
+        },
+        {
+          "column": "return_reason_name"
+        },
+        {
+          "column": "returned_at"
+        }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{eligibility.ticket_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "temporary_loan_case_id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "eligibility": "{{eligibility}}",
+            "summary": "{{summary}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Temporary loan summary could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

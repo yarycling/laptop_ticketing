@@ -1,0 +1,8 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "logistics.forward_to_repair" } }, "output": true },
+    { "name": "locations", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "columns": [{ "column": "id" }, { "column": "code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "location_type" }, "operation": "=", "value": "REPAIR_CENTRE" }, { "data": { "column": "is_active" }, "operation": "=", "value": 1 }] }, "orders": [{ "column": "name", "direction": "asc" }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "locations": "{{locations}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Repair Centre options could not be loaded." } } }] }
+}

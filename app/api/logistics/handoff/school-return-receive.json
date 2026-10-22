@@ -1,0 +1,1083 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "logistics_case_id",
+        "type": "number"
+      },
+      {
+        "name": "scan_reference",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "logistics.return_school_receive"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.logistics_case_id || $_POST.logistics_case_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid logistics case is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.scan_reference && $_POST.scan_reference.length > 255}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "The scan reference exceeds the allowed length."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "receive_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "v_logistics_physical_custody",
+                    "columns": [
+                      {
+                        "column": "logistics_case_id"
+                      },
+                      {
+                        "column": "logistics_number"
+                      },
+                      {
+                        "column": "ticket_id"
+                      },
+                      {
+                        "column": "device_id"
+                      },
+                      {
+                        "column": "replacement_case_id"
+                      },
+                      {
+                        "column": "logistics_status_id"
+                      },
+                      {
+                        "column": "logistics_status_code"
+                      },
+                      {
+                        "column": "ticket_status_id"
+                      },
+                      {
+                        "column": "ticket_status_code"
+                      },
+                      {
+                        "column": "physical_state_code"
+                      },
+                      {
+                        "column": "allocation_custody_level"
+                      },
+                      {
+                        "column": "allocation_district_id"
+                      },
+                      {
+                        "column": "allocation_school_id"
+                      },
+                      {
+                        "column": "allocation_student_id"
+                      },
+                      {
+                        "column": "device_lifecycle_code"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "logistics_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.logistics_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "case_record",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "ticket_logistics_cases",
+                      "alias": "c"
+                    },
+                    "columns": [
+                      {
+                        "table": "c",
+                        "column": "pickup_school_id"
+                      },
+                      {
+                        "table": "c",
+                        "column": "ticket_id"
+                      },
+                      {
+                        "table": "c",
+                        "column": "active_record_key"
+                      },
+                      {
+                        "table": "c",
+                        "column": "closed_at"
+                      },
+                      {
+                        "table": "t",
+                        "column": "origin_school_id"
+                      },
+                      {
+                        "table": "t",
+                        "column": "current_status_id"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "tickets",
+                        "alias": "t",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "t",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "c",
+                                "column": "ticket_id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "c",
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.logistics_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "destination",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "schools",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "name"
+                      },
+                      {
+                        "column": "district_id"
+                      },
+                      {
+                        "column": "status"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.replacement_case_id ? current.allocation_school_id : case_record.pickup_school_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "pending",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_handoffs",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "device_id"
+                      },
+                      {
+                        "column": "handoff_type"
+                      },
+                      {
+                        "column": "to_school_id"
+                      },
+                      {
+                        "column": "received_at"
+                      },
+                      {
+                        "column": "active_record_key"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "logistics_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.logistics_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "handoff_type"
+                          },
+                          "operation": "=",
+                          "value": "TTPOST_TO_SCHOOL"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        },
+                        {
+                          "data": {
+                            "column": "received_at"
+                          },
+                          "operator": "is_null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "returned_logistics",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_statuses",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "code"
+                          },
+                          "operation": "=",
+                          "value": "RETURNED_TO_SCHOOL"
+                        },
+                        {
+                          "data": {
+                            "column": "is_active"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "returned_ticket",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "ticket_statuses",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "code"
+                          },
+                          "operation": "=",
+                          "value": "RETURNED"
+                        },
+                        {
+                          "data": {
+                            "column": "is_active"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{current.device_source == 'TEMPORARY_LOAN_CONVERSION' || !current.logistics_case_id || ($_POST.device_id && $_POST.device_id != current.device_id) || current.logistics_status_code != 'RETURN_IN_TRANSIT' || current.ticket_status_code != 'COMPLETED' || current.physical_state_code != 'PENDING_SCHOOL_RETURN_RECEIPT' || !case_record.ticket_id || case_record.active_record_key != 1 || case_record.closed_at || case_record.pickup_school_id != case_record.origin_school_id || !destination.id || pending.to_school_id != destination.id || (current.replacement_case_id && pending.device_id != current.device_id) || pending.received_at || pending.active_record_key != 1 || !returned_logistics.id || !returned_ticket.id || !current.allocation_custody_level || (current.allocation_custody_level == 'STUDENT' && current.device_lifecycle_code != 'ASSIGNED') || (current.allocation_custody_level != 'STUDENT' && current.device_lifecycle_code != 'AVAILABLE')}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P7F_SCHOOL_RECEIVE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.schools.flatten('id').contains(destination.id) && !scope_context.districts.flatten('id').contains(destination.district_id)}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P7F_SCHOOL_RECEIVE_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "complete_handoff",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_handoffs",
+                    "values": [
+                      {
+                        "column": "received_at",
+                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}"
+                      },
+                      {
+                        "column": "received_by_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": null
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{pending.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "received_at"
+                          },
+                          "operator": "is_null"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{complete_handoff.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P7F_SCHOOL_RECEIVE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "scan",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_handoff_scans",
+                    "values": [
+                      {
+                        "column": "logistics_handoff_id",
+                        "value": "{{pending.id}}"
+                      },
+                      {
+                        "column": "scan_type",
+                        "value": "RECEIVE"
+                      },
+                      {
+                        "column": "scan_method",
+                        "value": "MANUAL"
+                      },
+                      {
+                        "column": "scan_reference",
+                        "value": "{{($_POST.scan_reference || '').trim() || null}}"
+                      },
+                      {
+                        "column": "scanned_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "close_case",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "ticket_logistics_cases",
+                    "values": [
+                      {
+                        "column": "current_status_id",
+                        "value": "{{returned_logistics.id}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": null
+                      },
+                      {
+                        "column": "closed_at",
+                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.logistics_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.logistics_status_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        },
+                        {
+                          "data": {
+                            "column": "closed_at"
+                          },
+                          "operator": "is_null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{close_case.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P7F_SCHOOL_RECEIVE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "logistics_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_status_history",
+                    "values": [
+                      {
+                        "column": "logistics_case_id",
+                        "value": "{{current.logistics_case_id}}"
+                      },
+                      {
+                        "column": "from_status_id",
+                        "value": "{{current.logistics_status_id}}"
+                      },
+                      {
+                        "column": "to_status_id",
+                        "value": "{{returned_logistics.id}}"
+                      },
+                      {
+                        "column": "changed_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "update_ticket",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "tickets",
+                    "values": [
+                      {
+                        "column": "current_status_id",
+                        "value": "{{returned_ticket.id}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.ticket_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_id"
+                          },
+                          "operation": "=",
+                          "value": "{{case_record.current_status_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{update_ticket.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P7F_SCHOOL_RECEIVE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "ticket_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "ticket_status_history",
+                    "values": [
+                      {
+                        "column": "ticket_id",
+                        "value": "{{current.ticket_id}}"
+                      },
+                      {
+                        "column": "from_status_id",
+                        "value": "{{case_record.current_status_id}}"
+                      },
+                      {
+                        "column": "to_status_id",
+                        "value": "{{returned_ticket.id}}"
+                      },
+                      {
+                        "column": "changed_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "logistics_school_return_received"
+                      },
+                      {
+                        "column": "module",
+                        "value": "logistics"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "logistics_handoff"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{pending.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "{{'School confirmed return receipt for ' + current.logistics_number + '.'}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "sla_return_complete",
+                "module": "core",
+                "action": "exec",
+                "output": true,
+                "options": {
+                  "exec": "sla_complete",
+                  "params": {
+                    "idempotency_key": "{{'RETURN_LOGISTICS:LOGISTICS:' + current.logistics_case_id}}",
+                    "completed_at": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}",
+                    "completion_event": "TTPOST_TO_SCHOOL_RECEIVED",
+                    "source_entity_type": "logistics_handoff",
+                    "source_entity_id": "{{pending.id}}",
+                    "actor_user_id": "{{identity}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "result",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "logistics_handoffs",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "id",
+                "alias": "handoff_id"
+              },
+              {
+                "table": "h",
+                "column": "logistics_case_id"
+              },
+              {
+                "table": "c",
+                "column": "logistics_number"
+              },
+              {
+                "table": "c",
+                "column": "closed_at"
+              },
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "school_id"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "life",
+                "column": "code",
+                "alias": "device_lifecycle_code"
+              }
+            ],
+            "joins": [
+              {
+                "table": "ticket_logistics_cases",
+                "alias": "c",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "c",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "schools",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "to_school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_ticket_effective_device",
+                "alias": "effective",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "effective",
+                      "column": "logistics_case_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "c",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "devices",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "effective",
+                        "column": "effective_device_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "device_lifecycle_statuses",
+                "alias": "life",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "life",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "d",
+                        "column": "lifecycle_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "logistics_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.logistics_case_id}}"
+                },
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "handoff_type"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_TO_SCHOOL"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ],
+            "limit": 1
+          }
+        }
+      },
+      {
+        "name": "notification_ticket",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": { "connection": "db", "sql": { "table": "ticket_logistics_cases", "columns": [{ "column": "ticket_id" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{result.logistics_case_id}}" }] } } }
+      },
+      {
+        "name": "notify_returned_to_school",
+        "module": "core",
+        "action": "exec",
+        "options": { "exec": "notification_from_workflow", "params": { "event_type_code": "LOGISTICS_RETURNED_TO_SCHOOL", "ticket_id": "{{notification_ticket.ticket_id}}", "logistics_case_id": "{{result.logistics_case_id}}", "handoff_id": "{{result.handoff_id}}", "actor_user_id": "{{identity}}", "message": "The school has confirmed receipt of the returned device." } }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "handoff_id": "{{result.handoff_id}}",
+            "logistics_case_id": "{{result.logistics_case_id}}",
+            "logistics_number": "{{result.logistics_number}}",
+            "school_id": "{{result.school_id}}",
+            "school_name": "{{result.school_name}}",
+            "returned_at": "{{result.closed_at}}",
+            "ticket_status_code": "RETURNED",
+            "logistics_status_code": "RETURNED_TO_SCHOOL",
+            "case_closed": true,
+            "device_lifecycle_code": "{{result.device_lifecycle_code}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P7F_SCHOOL_RECEIVE_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "You are not scoped to the School receiving this device."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P7F_SCHOOL_RECEIVE_STATE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "This return is no longer awaiting School receipt. No changes were committed."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "School return receipt could not be recorded. No partial changes were committed."
+          }
+        }
+      }
+    ]
+  }
+}

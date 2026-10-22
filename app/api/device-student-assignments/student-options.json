@@ -1,0 +1,469 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "school_id",
+        "type": "number"
+      },
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "page",
+        "type": "number"
+      },
+      {
+        "name": "page_size",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "device_student_assignments.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.school_id || $_GET.school_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid school is required."
+                  }
+                }
+              }
+            ],
+            "catch": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 500,
+                    "data": {
+                      "success": false,
+                      "error": "Eligible students could not be loaded. Please refresh and try again."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "school",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id"
+              },
+              {
+                "table": "s",
+                "column": "district_id"
+              },
+              {
+                "table": "s",
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.school_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school.id || school.status != 'active'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "School was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(school.district_id) && !scope_context.schools.flatten('id').contains(school.id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "You are not authorized to view students at this school."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "page",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "page",
+          "value": "{{$_GET.page && $_GET.page > 0 ? floor($_GET.page) : 1}}"
+        }
+      },
+      {
+        "name": "page_size",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "page_size",
+          "value": "{{!$_GET.page_size || $_GET.page_size < 1 ? 25 : ($_GET.page_size > 100 ? 100 : floor($_GET.page_size))}}"
+        }
+      },
+      {
+        "name": "total",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "students",
+              "alias": "st"
+            },
+            "joins": [
+              {
+                "table": "v_device_active_primary_student_assignments",
+                "alias": "active_assignment",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "active_assignment",
+                      "column": "student_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "st",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "columns": [
+              {
+                "table": "st",
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "school_id",
+                    "table": "st"
+                  },
+                  "operation": "=",
+                  "value": "{{school.id}}"
+                },
+                {
+                  "data": {
+                    "column": "status",
+                    "table": "st"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "student_reference"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "first_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "last_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "school_student_id_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "data": {
+                    "table": "active_assignment",
+                    "column": "student_id"
+                  },
+                  "operator": "is_null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "students",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "students",
+              "alias": "st"
+            },
+            "joins": [
+              {
+                "table": "v_device_active_primary_student_assignments",
+                "alias": "active_assignment",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "active_assignment",
+                      "column": "student_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "st",
+                        "column": "id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "columns": [
+              {
+                "table": "st",
+                "column": "id",
+                "alias": "student_id"
+              },
+              {
+                "table": "st",
+                "column": "student_reference"
+              },
+              {
+                "table": "st",
+                "column": "first_name"
+              },
+              {
+                "table": "st",
+                "column": "last_name"
+              },
+              {
+                "table": "st",
+                "column": "school_student_id_number"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "st",
+                    "column": "school_id"
+                  },
+                  "operation": "=",
+                  "value": "{{school.id}}"
+                },
+                {
+                  "data": {
+                    "table": "st",
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "st",
+                        "column": "student_reference"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "st",
+                        "column": "first_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "st",
+                        "column": "last_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "st",
+                        "column": "school_student_id_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "data": {
+                    "table": "active_assignment",
+                    "column": "student_id"
+                  },
+                  "operator": "is_null"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "st",
+                "column": "last_name",
+                "direction": "asc"
+              },
+              {
+                "table": "st",
+                "column": "first_name",
+                "direction": "asc"
+              }
+            ],
+            "limit": "{{page_size}}",
+            "offset": "{{(page - 1) * page_size}}"
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "school_id": "{{school.id}}",
+            "students": "{{students}}",
+            "page": "{{page}}",
+            "page_size": "{{page_size}}",
+            "total": "{{total}}",
+            "total_pages": "{{ceil(total / page_size)}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "Student options could not be loaded."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,70 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="deviceDetailPage" appConnect="local" -->
+<meta name="ac:route" content="/devices/detail">
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context" dmx-on:success="authContext.data.can_device_district_allocations_view ? districtHistory.load({device_id:query.id,status:'all'}) : null;authContext.data.can_device_school_allocations_view ? schoolHistory.load({device_id:query.id,status:'all'}) : null;authContext.data.can_device_student_assignments_view ? studentHistory.load({device_id:query.id,status:'all'}) : null"></dmx-serverconnect>
+  <dmx-serverconnect id="deviceDetail" url="/api/devices/detail" dmx-param:id="query.id"></dmx-serverconnect>
+  <dmx-serverconnect id="scopeContext" url="/api/auth/scope_context"></dmx-serverconnect>
+  <dmx-serverconnect id="districtHistory" url="/api/device-district-allocations/list" noload="true" dmx-param:device_id="query.id" dmx-param:status="all" dmx-param:page_size="100"></dmx-serverconnect>
+  <dmx-serverconnect id="schoolHistory" url="/api/device-school-allocations/list" noload="true" dmx-param:device_id="query.id" dmx-param:status="all" dmx-param:page_size="100"></dmx-serverconnect>
+  <dmx-serverconnect id="studentHistory" url="/api/device-student-assignments/list" noload="true" dmx-param:device_id="query.id" dmx-param:status="all" dmx-param:page_size="100"></dmx-serverconnect>
+  <%- await include("partials/portal-sidebar", { currentPage: "devices" }) %>
+  <div class="portal-workspace">
+    <%- await include("partials/portal-topbar", { backHref: "/devices", pageTitle: "Device Detail" }) %>
+    <main class="portal-main device-detail-page" aria-label="Device detail">
+      <div class="text-muted py-3" role="status" dmx-show="deviceDetail.state.executing">Loading device...</div>
+      <div class="alert alert-danger" role="alert" dmx-show="deviceDetail.lastError.status" dmx-text="deviceDetail.lastError.response && deviceDetail.lastError.response.error ? deviceDetail.lastError.response.error : 'Device details could not be loaded.'"></div>
+      <div dmx-show="deviceDetail.data.device">
+        <header class="device-detail-hero"><div><span class="device-detail-eyebrow">ASSET MANAGEMENT</span><h1>Device Detail</h1><p>View device information, allocation details, warranty coverage and history.</p></div></header>
+        <section class="device-detail-summary" aria-label="Device summary">
+          <div class="device-detail-summary-icon"><i class="fas fa-laptop" aria-hidden="true"></i></div>
+          <img class="device-detail-thumb" dmx-show="deviceDetail.data.device.image_available" dmx-bind:src="'/api/devices/image?id=' + query.id" dmx-bind:alt="'Device image for ' + deviceDetail.data.device.serial_number">
+          <div class="device-detail-summary-copy"><span>Device Asset</span><h2 dmx-text="deviceDetail.data.device.serial_number"></h2></div>
+          <span class="device-detail-status" dmx-text="deviceDetail.data.device.lifecycle_name"></span>
+          <a class="btn btn-bmobile-secondary device-detail-back" href="/devices"><i class="fas fa-arrow-left me-1" aria-hidden="true"></i>Back to Devices</a>
+        </section>
+        <div class="device-detail-grid">
+          <div class="device-detail-column">
+            <section class="device-detail-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-fingerprint" aria-hidden="true"></i></span><h2>Identity</h2></header>
+              <dl class="device-detail-rows"><div><dt>Asset Tag</dt><dd dmx-text="deviceDetail.data.device.asset_tag || 'Not recorded'"></dd></div><div><dt>Manufacturer</dt><dd dmx-text="deviceDetail.data.device.manufacturer_name"></dd></div><div><dt>Model</dt><dd dmx-text="deviceDetail.data.device.model_name + ' (' + deviceDetail.data.device.model_code + ')' "></dd></div><div><dt>Condition</dt><dd dmx-text="deviceDetail.data.device.condition_name"></dd></div><div><dt>Lifecycle</dt><dd dmx-text="deviceDetail.data.device.lifecycle_name"></dd></div></dl>
+            </section>
+            <section class="device-detail-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-users" aria-hidden="true"></i></span><h2>Educational Allocation</h2></header>
+              <dl class="device-detail-rows"><div><dt>Custody Level</dt><dd dmx-text="deviceDetail.data.device.current_custody_level || 'Not recorded'"></dd></div><div><dt>District</dt><dd dmx-text="deviceDetail.data.device.district_name || 'Not allocated to a district'"></dd></div><div><dt>School</dt><dd dmx-text="deviceDetail.data.device.school_name || 'Not allocated to a school'"></dd></div><div dmx-show="deviceDetail.data.device.current_custody_level == 'STUDENT'"><dt>Student</dt><dd dmx-text="deviceDetail.data.device.student_reference + ' — ' + deviceDetail.data.device.student_first_name + ' ' + deviceDetail.data.device.student_last_name"></dd></div><div dmx-show="deviceDetail.data.device.current_custody_level == 'STUDENT'"><dt>Assignment Type</dt><dd dmx-text="deviceDetail.data.device.student_assignment_type"></dd></div></dl>
+            </section>
+            <section class="device-detail-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-shield-alt" aria-hidden="true"></i></span><h2>Warranty</h2></header>
+              <dl class="device-detail-rows"><div><dt>Warranty Start</dt><dd dmx-text="deviceDetail.data.date_display.warranty_start_date"></dd></div><div><dt>Warranty End</dt><dd dmx-text="deviceDetail.data.date_display.warranty_end_date"></dd></div><div><dt>Warranty Reference</dt><dd dmx-text="deviceDetail.data.device.warranty_reference || 'Not recorded'"></dd></div></dl>
+            </section>
+            <section class="device-detail-card" dmx-show="deviceDetail.data.physical_stock_location.stock_location_id">
+              <header><span class="device-detail-card-icon"><i class="fas fa-warehouse" aria-hidden="true"></i></span><h2>Physical Stock Location</h2></header>
+              <dl class="device-detail-rows"><div><dt>Custody</dt><dd dmx-text="deviceDetail.data.physical_stock_location.physical_custody_name"></dd></div><div><dt>Repair Centre</dt><dd dmx-text="deviceDetail.data.physical_stock_location.service_location_name"></dd></div><div><dt>Reservation</dt><dd dmx-text="deviceDetail.data.physical_stock_location.is_reserved_for_replacement == 1 ? 'Reserved' : 'Available'"></dd></div></dl>
+            </section>
+          </div>
+          <div class="device-detail-column">
+            <section class="device-detail-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-shopping-cart" aria-hidden="true"></i></span><h2>Receipt &amp; Procurement</h2></header>
+              <dl class="device-detail-rows"><div><dt>Received Date</dt><dd dmx-text="deviceDetail.data.date_display.received_date"></dd></div><div><dt>Procurement Reference</dt><dd dmx-text="deviceDetail.data.device.procurement_reference || 'Not recorded'"></dd></div><div><dt>Supplier</dt><dd dmx-text="deviceDetail.data.device.supplier_name || 'Not recorded'"></dd></div></dl>
+            </section>
+            <section class="device-detail-card device-detail-notes-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-file-alt" aria-hidden="true"></i></span><h2>Notes</h2></header>
+              <p class="device-detail-notes" dmx-text="deviceDetail.data.device.notes || 'No notes recorded.'"></p>
+            </section>
+            <section class="device-detail-card">
+              <header><span class="device-detail-card-icon"><i class="fas fa-clock" aria-hidden="true"></i></span><h2>Record</h2></header>
+              <dl class="device-detail-rows"><div><dt>Created</dt><dd dmx-text="deviceDetail.data.date_display.created_at"></dd></div><div><dt>Last Updated</dt><dd dmx-text="deviceDetail.data.date_display.updated_at"></dd></div></dl>
+            </section>
+          </div>
+        </div>
+        <section class="device-detail-card device-history-card" aria-labelledby="custodyHistoryTitle">
+          <header><span class="device-detail-card-icon"><i class="fas fa-history" aria-hidden="true"></i></span><h2 id="custodyHistoryTitle">Custody &amp; Assignment History</h2></header>
+          <div class="device-history-grid">
+            <section class="device-history-panel" dmx-show="authContext.data.can_device_district_allocations_view"><header><span class="device-history-icon"><i class="fas fa-landmark" aria-hidden="true"></i></span><h3>District Allocation History</h3></header><div class="table-responsive"><table class="table portal-table align-middle"><thead><tr><th>District</th><th>Allocated At</th><th>Allocated By</th><th>Returned At</th><th>Returned By</th><th>Reason</th><th>Status</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="districtHistory.data.allocations"><tr><td dmx-text="district_name"></td><td dmx-text="allocated_at.formatDate('MMM d, yyyy, hh:mm A')"></td><td dmx-text="allocated_by || '-'">-</td><td dmx-text="returned_at ? returned_at.formatDate('MMM d, yyyy, hh:mm A') : '-'">-</td><td dmx-text="returned_by || '-'">-</td><td dmx-text="return_reason || '-'">-</td><td><span class="device-history-status" dmx-text="active_record_key == 1 ? 'ACTIVE' : 'RETURNED'"></span></td></tr></tbody></table></div><p class="device-history-empty" dmx-show="districtHistory.data.total == 0">No district allocation history.</p></section>
+            <section class="device-history-panel" dmx-show="authContext.data.can_device_school_allocations_view"><header><span class="device-history-icon"><i class="fas fa-school" aria-hidden="true"></i></span><h3>School Allocation History</h3></header><div class="table-responsive"><table class="table portal-table align-middle"><thead><tr><th>District</th><th>School</th><th>Allocated At</th><th>Allocated By</th><th>Returned At</th><th>Returned By</th><th>Reason</th><th>Status</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="schoolHistory.data.allocations"><tr><td dmx-text="district_name"></td><td dmx-text="school_name"></td><td dmx-text="allocated_at.formatDate('MMM d, yyyy, hh:mm A')"></td><td dmx-text="allocated_by || '-'">-</td><td dmx-text="returned_at ? returned_at.formatDate('MMM d, yyyy, hh:mm A') : '-'">-</td><td dmx-text="returned_by || '-'">-</td><td dmx-text="return_reason || '-'">-</td><td><span class="device-history-status" dmx-text="is_active == 1 ? 'ACTIVE' : 'RETURNED'"></span></td></tr></tbody></table></div><p class="device-history-empty" dmx-show="schoolHistory.data.total == 0">No school allocation history.</p></section>
+            <section class="device-history-panel device-history-student" dmx-show="authContext.data.can_device_student_assignments_view"><header><span class="device-history-icon"><i class="fas fa-user" aria-hidden="true"></i></span><h3>Student Assignment History</h3></header><div class="table-responsive"><table class="table portal-table align-middle"><thead><tr><th>Student Reference</th><th>Student Name</th><th>Assignment Type</th><th>Assigned At</th><th>Assigned By</th><th>Returned At</th><th>Returned By</th><th>Reason</th><th>Status</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="studentHistory.data.assignments"><tr><td dmx-text="student_reference"></td><td dmx-text="first_name + ' ' + last_name"></td><td dmx-text="assignment_type"></td><td dmx-text="assigned_at.formatDate('MMM d, yyyy, hh:mm A')"></td><td dmx-text="assigned_by || '-'">-</td><td dmx-text="returned_at ? returned_at.formatDate('MMM d, yyyy, hh:mm A') : '-'">-</td><td dmx-text="returned_by || '-'">-</td><td dmx-text="return_reason || '-'">-</td><td><span class="device-history-status" dmx-text="is_active == 1 ? 'ACTIVE' : 'RETURNED'"></span></td></tr></tbody></table></div><p class="device-history-empty" dmx-show="studentHistory.data.total == 0">No student assignment history.</p></section>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>

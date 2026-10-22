@@ -1,0 +1,114 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_PARAM.outcome_code == 'REPAIRED_SUCCESSFULLY'}}",
+          "then": {
+            "steps": [
+              {
+                "name": "complete_repair_sla",
+                "module": "core",
+                "action": "exec",
+                "output": true,
+                "options": {
+                  "exec": "sla_complete",
+                  "params": {
+                    "idempotency_key": "{{$_PARAM.idempotency_key}}",
+                    "completed_at": "{{$_PARAM.completed_at}}",
+                    "completion_event": "LOCAL_REPAIR_COMPLETED_SUCCESSFULLY",
+                    "source_entity_type": "repair_job",
+                    "source_entity_id": "{{$_PARAM.repair_job_id}}",
+                    "actor_user_id": "{{$_PARAM.actor_user_id}}"
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "cancel_repair_sla",
+                "module": "core",
+                "action": "exec",
+                "output": true,
+                "options": {
+                  "exec": "sla_cancel",
+                  "params": {
+                    "idempotency_key": "{{$_PARAM.idempotency_key}}",
+                    "cancelled_at": "{{$_PARAM.completed_at}}",
+                    "reason": "Local repair ended in a non-local disposition.",
+                    "source_entity_type": "repair_job",
+                    "source_entity_id": "{{$_PARAM.repair_job_id}}",
+                    "actor_user_id": "{{$_PARAM.actor_user_id}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_PARAM.is_return_ready == 1 && $_PARAM.effective_device_id && $_PARAM.effective_device_source != 'TEMPORARY_LOAN_CONVERSION'}}",
+          "then": {
+            "steps": [
+              {
+                "name": "start_return_sla",
+                "module": "core",
+                "action": "exec",
+                "output": true,
+                "options": {
+                  "exec": "sla_start",
+                  "params": {
+                    "policy_code": "RETURN_LOGISTICS",
+                    "idempotency_key": "{{'RETURN_LOGISTICS:LOGISTICS:' + $_PARAM.logistics_case_id}}",
+                    "ticket_id": "{{$_PARAM.ticket_id}}",
+                    "ticket_number": "{{$_PARAM.ticket_number}}",
+                    "logistics_case_id": "{{$_PARAM.logistics_case_id}}",
+                    "repair_job_id": "{{$_PARAM.repair_job_id}}",
+                    "device_id": "{{$_PARAM.device_id}}",
+                    "effective_device_id": "{{$_PARAM.effective_device_id}}",
+                    "source_workflow": "NORMAL_RETURN",
+                    "source_entity_type": "logistics_case",
+                    "source_entity_id": "{{$_PARAM.logistics_case_id}}",
+                    "started_at": "{{$_PARAM.completed_at}}",
+                    "actor_user_id": "{{$_PARAM.actor_user_id}}"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "name": "sla_failure_audit",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "repair_sla_failure_audit",
+          "params": {
+            "repair_job_id": "{{$_PARAM.repair_job_id}}",
+            "ticket_id": "{{$_PARAM.ticket_id}}",
+            "actor_user_id": "{{$_PARAM.actor_user_id}}"
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "repair_sla_side_effect_failed",
+          "value": true
+        }
+      }
+    ]
+  }
+}

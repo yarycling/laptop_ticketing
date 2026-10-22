@@ -1,0 +1,134 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "number",
+        "name": "id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "schools.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "school",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "s",
+                "column": "school_code",
+                "alias": "school_code"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "name"
+              },
+              {
+                "table": "s",
+                "column": "district_id",
+                "alias": "district_id"
+              },
+              {
+                "table": "s",
+                "column": "status",
+                "alias": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "School was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "school": "{{school}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

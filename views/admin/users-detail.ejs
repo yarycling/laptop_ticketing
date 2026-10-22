@@ -1,0 +1,121 @@
+<!-- Wappler include head-page="layouts/main" bootstrap5="local" is="dmx-app" appConnect="local" components="{dmxBootstrap5Modal:{}}" -->
+<meta name="ac:route" content="/admin/users/detail">
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-value id="notice"></dmx-value>
+  <dmx-serverconnect id="userDetail" url="/api/admin/users/detail" dmx-param:user_id="query.user_id"></dmx-serverconnect>
+  <%- await include("../partials/portal-sidebar", { currentPage: "users" }) %>
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "User Detail" }) %>
+    <main class="portal-main user-detail-page" aria-label="User Detail">
+      <a class="user-detail-back" href="/admin/users"><i class="fas fa-arrow-left" aria-hidden="true"></i> Back to Users</a>
+      <header class="user-detail-heading" dmx-show="userDetail.data.user.id">
+        <div class="user-detail-title">
+          <h1 dmx-text="userDetail.data.user.display_name || 'User Detail'">User Detail</h1>
+          <span class="user-detail-status" dmx-class:is-active="userDetail.data.user.status == 'active'" dmx-text="userDetail.data.user.status == 'disabled' ? 'Inactive' : userDetail.data.user.status">Status</span>
+          <p dmx-text="userDetail.data.user.username"></p>
+        </div>
+        <a class="btn btn-bmobile-primary user-detail-edit" dmx-bind:href="'/admin/users/edit?user_id=' + query.user_id" dmx-show="authContext.data.can_users_update"><i class="fas fa-pen" aria-hidden="true"></i> Edit User</a>
+      </header>
+
+      <p class="user-detail-loading" role="status" dmx-show="userDetail.state.executing"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> Loading user…</p>
+      <div role="alert" class="alert alert-danger" dmx-show="userDetail.lastError.status">User could not be loaded.</div>
+      <div role="status" class="alert alert-info" dmx-show="notice.value" dmx-text="notice.value"></div>
+
+      <div class="user-detail-overview" dmx-show="userDetail.data.user.id">
+        <section class="user-detail-card" aria-labelledby="userProfileHeading">
+          <div class="user-detail-card-heading">
+            <span class="user-detail-icon is-green"><i class="fas fa-user" aria-hidden="true"></i></span>
+            <div><h2 id="userProfileHeading">Profile</h2><p>Basic user information</p></div>
+          </div>
+          <dl class="user-detail-facts">
+            <div><dt><i class="far fa-envelope" aria-hidden="true"></i>Email</dt><dd dmx-text="userDetail.data.user.email"></dd></div>
+            <div><dt><i class="fas fa-shield-alt" aria-hidden="true"></i>Status</dt><dd><span class="user-detail-value-pill is-green" dmx-text="userDetail.data.user.status == 'disabled' ? 'Inactive' : userDetail.data.user.status"></span></dd></div>
+            <div><dt><i class="fas fa-user-friends" aria-hidden="true"></i>Security Groups</dt><dd dmx-text="userDetail.data.user.security_groups"></dd></div>
+            <div><dt><i class="fas fa-globe" aria-hidden="true"></i>Scope</dt><dd dmx-text="userDetail.data.user.scope_summary"></dd></div>
+          </dl>
+        </section>
+
+        <section class="user-detail-card" aria-labelledby="userSecurityHeading">
+          <div class="user-detail-card-heading">
+            <span class="user-detail-icon is-green"><i class="fas fa-shield-alt" aria-hidden="true"></i></span>
+            <div><h2 id="userSecurityHeading">Security</h2><p>Account security details</p></div>
+          </div>
+          <dl class="user-detail-facts">
+            <div><dt><i class="far fa-calendar-alt" aria-hidden="true"></i>Last login</dt><dd dmx-text="userDetail.data.user.last_login_at || 'Never signed in'"></dd></div>
+            <div><dt><i class="fas fa-lock" aria-hidden="true"></i>Password last set</dt><dd dmx-text="userDetail.data.user.password_changed_at || 'Setup pending'"></dd></div>
+            <div><dt><i class="far fa-calendar-alt" aria-hidden="true"></i>Created</dt><dd dmx-text="userDetail.data.user.created_at"></dd></div>
+            <div><dt><i class="fas fa-redo-alt" aria-hidden="true"></i>Updated</dt><dd dmx-text="userDetail.data.user.updated_at"></dd></div>
+          </dl>
+        </section>
+
+        <section class="user-detail-card" aria-labelledby="userAccessHeading">
+          <div class="user-detail-card-heading">
+            <span class="user-detail-icon is-green"><i class="fas fa-users" aria-hidden="true"></i></span>
+            <div><h2 id="userAccessHeading">Access Summary</h2><p>User access and permissions</p></div>
+          </div>
+          <dl class="user-detail-facts">
+            <div><dt><i class="fas fa-shield-alt" aria-hidden="true"></i>Role</dt><dd><span class="user-detail-value-pill is-green" dmx-text="userDetail.data.user.security_groups"></span></dd></div>
+            <div><dt><i class="fas fa-cube" aria-hidden="true"></i>Total Permissions</dt><dd><span class="user-detail-value-pill" dmx-text="userDetail.data.permissions.length + ' permissions'"></span></dd></div>
+            <div><dt><i class="fas fa-globe" aria-hidden="true"></i>Scope</dt><dd dmx-text="userDetail.data.user.scope_summary"></dd></div>
+            <div><dt><i class="fas fa-key" aria-hidden="true"></i>Full Access</dt><dd><span dmx-text="userDetail.data.role_codes.contains('SUPER_ADMIN') ? 'All portal permissions' : 'Role-based access'"></span><i class="fas fa-info-circle user-detail-info" aria-hidden="true" title="Access is determined by the assigned security groups and scope."></i></dd></div>
+          </dl>
+        </section>
+      </div>
+
+      <section class="user-detail-actions" aria-label="User actions" dmx-show="userDetail.data.user.id">
+        <form id="sendsetupForm" is="dmx-serverconnect-form" method="post" action="/api/admin/users/send-setup" dmx-show="authContext.data.can_users_update && userDetail.data.user.status == 'active' && !userDetail.data.user.password_changed_at" dmx-on:success="userDetail.load();notice.setValue(sendsetupForm.data.message)">
+          <input type="hidden" name="user_id" dmx-bind:value="query.user_id">
+          <button class="btn btn-bmobile-secondary" type="submit" dmx-bind:disabled="sendsetupForm.state.executing"><i class="far fa-envelope" aria-hidden="true"></i> Resend setup email</button>
+          <span class="text-danger" role="alert" dmx-show="sendsetupForm.lastError.status" dmx-text="sendsetupForm.lastError.response.error"></span>
+        </form>
+        <form id="sendpasswordresetForm" is="dmx-serverconnect-form" method="post" action="/api/admin/users/send-password-reset" dmx-show="authContext.data.can_users_update && userDetail.data.user.status == 'active'" dmx-on:success="userDetail.load();notice.setValue(sendpasswordresetForm.data.message)">
+          <input type="hidden" name="user_id" dmx-bind:value="query.user_id">
+          <button class="btn btn-bmobile-secondary" type="submit" dmx-bind:disabled="sendpasswordresetForm.state.executing"><i class="far fa-envelope" aria-hidden="true"></i> Send password reset email</button>
+          <span class="text-danger" role="alert" dmx-show="sendpasswordresetForm.lastError.status" dmx-text="sendpasswordresetForm.lastError.response.error"></span>
+        </form>
+        <form id="reactivateForm" is="dmx-serverconnect-form" method="post" action="/api/admin/users/reactivate" dmx-show="authContext.data.can_users_disable && userDetail.data.user.status != 'active'" dmx-on:success="userDetail.load();notice.setValue(reactivateForm.data.message)">
+          <input type="hidden" name="user_id" dmx-bind:value="query.user_id">
+          <button class="btn btn-bmobile-secondary" type="submit" dmx-bind:disabled="reactivateForm.state.executing"><i class="fas fa-user-check" aria-hidden="true"></i> Reactivate User</button>
+          <span class="text-danger" role="alert" dmx-show="reactivateForm.lastError.status" dmx-text="reactivateForm.lastError.response.error"></span>
+        </form>
+        <button type="button" class="btn btn-outline-danger" dmx-show="authContext.data.can_users_disable && userDetail.data.user.status == 'active'" dmx-on:click="deactivateModal.show()"><i class="fas fa-ban" aria-hidden="true"></i> Deactivate User</button>
+      </section>
+
+      <section class="user-detail-card user-permissions-card" aria-labelledby="userPermissionsHeading" dmx-show="userDetail.data.user.id">
+        <div class="user-detail-card-heading user-permissions-heading">
+          <span class="user-detail-icon is-blue"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
+          <div><h2 id="userPermissionsHeading">Permissions</h2><p dmx-text="userDetail.data.role_codes.contains('SUPER_ADMIN') ? 'All portal permissions (Super Administrator)' : 'Permissions granted by assigned security groups'"></p></div>
+          <span class="user-permissions-count"><i class="fas fa-check-circle" aria-hidden="true"></i><span dmx-text="userDetail.data.permissions.length + ' permissions'"></span></span>
+        </div>
+        <div class="user-permission-list" aria-label="Assigned permissions">
+          <span class="user-permission-chip" dmx-repeat:permissions="userDetail.data.permissions" dmx-text="permission_name"></span>
+        </div>
+      </section>
+
+      <section class="user-detail-card user-activity-card" aria-labelledby="userActivityHeading" dmx-show="userDetail.data.user.id">
+        <div class="user-detail-card-heading">
+          <span class="user-detail-icon is-blue"><i class="far fa-clock" aria-hidden="true"></i></span>
+          <div><h2 id="userActivityHeading">Recent administration activity</h2><p>Latest actions performed for this user</p></div>
+        </div>
+        <div class="user-activity-scroll">
+          <table class="table user-activity-table">
+            <thead><tr><th scope="col">When</th><th scope="col">Action</th><th scope="col">Details</th></tr></thead>
+            <tbody is="dmx-repeat" dmx-bind:repeat="userDetail.data.activity"><tr><td data-label="When" dmx-text="created_at"></td><td data-label="Action"><span class="user-activity-action" dmx-text="action"></span></td><td data-label="Details" dmx-text="description"></td></tr></tbody>
+            <tbody dmx-show="userDetail.data.activity.length == 0"><tr><td colspan="3" class="user-activity-empty">No recent administration activity.</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="deactivateModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="deactivateTitle">
+  <div class="modal-dialog modal-dialog-centered"><div class="modal-content portal-modal">
+    <form id="deactivateForm" is="dmx-serverconnect-form" method="post" action="/api/admin/users/deactivate" dmx-on:success="deactivateModal.hide();userDetail.load();notice.setValue('User deactivated.')">
+      <div class="modal-header"><h2 id="deactivateTitle" class="modal-title h5">Deactivate this user?</h2><button type="button" class="btn-close" aria-label="Close" dmx-on:click="deactivateModal.hide()"></button></div>
+      <div class="modal-body"><p>They will no longer be able to sign in. Their history will be preserved.</p><input type="hidden" name="user_id" dmx-bind:value="query.user_id"><div role="alert" class="text-danger" dmx-show="deactivateForm.lastError.status" dmx-text="deactivateForm.lastError.response.error"></div></div>
+      <div class="modal-footer"><button class="btn btn-bmobile-secondary" type="button" dmx-on:click="deactivateModal.hide()">Cancel</button><button class="btn btn-danger" type="submit" dmx-bind:disabled="deactivateForm.state.executing">Confirm Deactivation</button></div>
+    </form>
+  </div></div>
+</div>

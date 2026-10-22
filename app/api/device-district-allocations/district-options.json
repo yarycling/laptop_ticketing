@@ -1,0 +1,10 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "device_district_allocations.manage" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Only national inventory managers can select allocation districts." } } }] } } },
+    { "name": "districts", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "districts", "columns": [{ "column": "id" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "column": "name", "direction": "asc" }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "districts": "{{districts}}" } } }
+  ], "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "District options could not be loaded." } } }] } }
+}

@@ -1,0 +1,138 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "users.create"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "user_admin_mutate",
+          "params": {
+            "mode": "create"
+          }
+        },
+        "name": "result"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "user_admin_send_email",
+          "params": {
+            "user_id": "{{result.user_id}}",
+            "purpose": "ACCOUNT_SETUP",
+            "actor_id": "{{identity}}"
+          }
+        },
+        "name": "delivery"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "user_id": "{{result.user_id}}",
+            "message": "{{delivery.sent ? 'User created. Account setup email sent.' : 'User created. Setup email was not sent. Open the user to retry.'}}",
+            "email_sent": "{{delivery.sent}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "user_id",
+        "type": "text"
+      },
+      {
+        "name": "full_name",
+        "type": "text"
+      },
+      {
+        "name": "username",
+        "type": "text"
+      },
+      {
+        "name": "email",
+        "type": "text"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      },
+      {
+        "name": "auth_version",
+        "type": "text"
+      },
+      {
+        "name": "role_codes",
+        "type": "array"
+      },
+      {
+        "name": "district_ids",
+        "type": "array"
+      },
+      {
+        "name": "school_ids",
+        "type": "array"
+      },
+      {
+        "name": "school_district_ids",
+        "type": "array"
+      },
+      {
+        "name": "service_location_ids",
+        "type": "array"
+      }
+    ]
+  }
+}

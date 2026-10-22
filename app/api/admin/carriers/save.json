@@ -1,0 +1,19 @@
+{
+ "settings":{"options":{"method":"post"}},"meta":{"$_POST":[{"name":"carrier_id","type":"number"},{"name":"carrier_code","type":"text"},{"name":"name","type":"text"},{"name":"sort_order","type":"number"}]},
+ "exec":{"steps":[
+  {"name":"permission","module":"core","action":"exec","options":{"exec":"security_require_permission","params":{"permission":"carriers.manage"}}},
+  {"module":"core","action":"condition","options":{"if":"{{!$_POST.name || $_POST.name.trim().length > 180 || (!$_POST.carrier_id && (!$_POST.carrier_code || $_POST.carrier_code.trim().length > 50 || $_POST.carrier_code.trim().contains(' '))) || ($_POST.sort_order && ($_POST.sort_order < 0 || floor($_POST.sort_order) != $_POST.sort_order))}}","then":{"steps":[{"module":"core","action":"response","options":{"status":400,"data":{"success":false,"error":"Enter a valid carrier name, code and sort order."}}}]} }},
+  {"module":"core","action":"condition","options":{"if":"{{$_POST.carrier_id}}","then":{"steps":[
+   {"name":"carrier","module":"dbconnector","action":"single","output":true,"options":{"connection":"db","sql":{"table":"carriers","columns":[{"column":"id"},{"column":"carrier_code"}],"wheres":{"condition":"AND","rules":[{"data":{"column":"id"},"operation":"=","value":"{{$_POST.carrier_id}}"}]}}}},
+   {"module":"core","action":"condition","options":{"if":"{{!carrier.id}}","then":{"steps":[{"module":"core","action":"response","options":{"status":404,"data":{"success":false,"error":"Carrier was not found."}}}]} }},
+   {"name":"update","module":"dbupdater","action":"update","options":{"connection":"db","sql":{"table":"carriers","values":[{"column":"name","value":"{{$_POST.name.trim()}}"},{"column":"sort_order","value":"{{$_POST.sort_order != null && $_POST.sort_order != '' ? $_POST.sort_order : 100}}"}],"wheres":{"condition":"AND","rules":[{"data":{"column":"id"},"operation":"=","value":"{{carrier.id}}"}]}}}},
+   {"module":"core","action":"response","options":{"status":200,"data":{"success":true,"carrier_id":"{{carrier.id}}","updated":true}}}
+  ]},"else":{"steps":[
+   {"name":"insert","module":"dbupdater","action":"insert","output":true,"options":{"connection":"db","sql":{"table":"carriers","values":[{"column":"carrier_code","value":"{{$_POST.carrier_code.trim()}}"},{"column":"name","value":"{{$_POST.name.trim()}}"},{"column":"carrier_type","value":"EXTERNAL"},{"column":"is_default","value":0},{"column":"status","value":"active"},{"column":"sort_order","value":"{{$_POST.sort_order != null && $_POST.sort_order != '' ? $_POST.sort_order : 100}}"}]}}},
+   {"module":"core","action":"response","options":{"status":201,"data":{"success":true,"carrier_id":"{{insert.identity}}","updated":false}}}
+  ]}}}
+ ],"catch":[
+  {"module":"core","action":"condition","options":{"if":"{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}","then":{"steps":[{"module":"core","action":"response","options":{"status":409,"data":{"success":false,"error":"A carrier with this code or name already exists."}}}]}}},
+  {"module":"core","action":"response","options":{"status":500,"data":{"success":false,"error":"Carrier could not be saved."}}}
+ ]}
+}

@@ -1,0 +1,15 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": {
+    "steps": [
+      { "module": "core", "action": "exec", "options": { "exec": "security_require_device_imports_view", "params": {} } },
+      { "name": "manufacturers", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "manufacturers", "columns": [{ "column": "id" }, { "column": "manufacturer_code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "column": "name", "direction": "asc" }] } } },
+      { "name": "models", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "device_models", "alias": "m" }, "columns": [{ "table": "m", "column": "id" }, { "table": "m", "column": "manufacturer_id" }, { "table": "m", "column": "model_code" }, { "table": "m", "column": "model_name" }], "joins": [{ "table": "manufacturers", "alias": "mf", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "mf", "column": "id", "operation": "=", "value": { "table": "m", "column": "manufacturer_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "m", "column": "status" }, "operation": "=", "value": "active" }, { "data": { "table": "mf", "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "table": "mf", "column": "name", "direction": "asc" }, { "table": "m", "column": "model_name", "direction": "asc" }] } } },
+      { "name": "conditions", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "device_conditions", "columns": [{ "column": "code" }, { "column": "name" }, { "column": "sort_order" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "column": "sort_order", "direction": "asc" }] } } },
+      { "name": "template_uuid", "module": "core", "action": "randomUUID", "output": true, "options": {} },
+      { "name": "template_file", "module": "device_xlsx", "action": "generateTemplate", "output": true, "options": { "manufacturers": "{{manufacturers}}", "models": "{{models}}", "conditions": "{{conditions}}", "path": "{{'/storage/device-import-templates/' + template_uuid + '.xlsx'}}" } },
+      { "module": "fs", "action": "download", "options": { "path": "{{template_file.path}}", "filename": "device-import-template.xlsx" } }
+    ],
+    "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "The Excel template could not be generated." } } }]
+  }
+}

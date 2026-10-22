@@ -1,0 +1,31 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "device_student_assignments.view" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_GET.id || $_GET.id < 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "A valid student assignment ID is required." } } }] } } },
+    { "name": "assignment", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "device_student_assignments", "alias": "a" },
+      "joins": [
+        { "table": "devices", "alias": "dv", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "dv", "column": "id", "operation": "=", "value": { "table": "a", "column": "device_id" } }] } },
+        { "table": "device_school_allocations", "alias": "sha", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "sha", "column": "id", "operation": "=", "value": { "table": "a", "column": "school_allocation_id" } }] } },
+        { "table": "device_district_allocations", "alias": "da", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "da", "column": "id", "operation": "=", "value": { "table": "sha", "column": "district_allocation_id" } }] } },
+        { "table": "schools", "alias": "s", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "s", "column": "id", "operation": "=", "value": { "table": "sha", "column": "school_id" } }] } },
+        { "table": "districts", "alias": "d", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "d", "column": "id", "operation": "=", "value": { "table": "da", "column": "district_id" } }] } },
+        { "table": "students", "alias": "st", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "st", "column": "id", "operation": "=", "value": { "table": "a", "column": "student_id" } }] } },
+        { "table": "device_models", "alias": "m", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "m", "column": "id", "operation": "=", "value": { "table": "dv", "column": "device_model_id" } }] } },
+        { "table": "manufacturers", "alias": "mf", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "mf", "column": "id", "operation": "=", "value": { "table": "m", "column": "manufacturer_id" } }] } },
+        { "table": "device_conditions", "alias": "c", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "c", "column": "id", "operation": "=", "value": { "table": "dv", "column": "condition_id" } }] } },
+        { "table": "device_lifecycle_statuses", "alias": "ls", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "ls", "column": "id", "operation": "=", "value": { "table": "dv", "column": "lifecycle_status_id" } }] } },
+        { "table": "users", "alias": "u", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "a", "column": "assigned_by_user_id" } }] } },
+        { "table": "v_device_current_custody", "alias": "cc", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "cc", "column": "device_id", "operation": "=", "value": { "table": "dv", "column": "id" } }] } }
+      ],
+      "columns": [{ "table": "a", "column": "id", "alias": "student_assignment_id" }, { "table": "a", "column": "school_allocation_id" }, { "table": "da", "column": "id", "alias": "district_allocation_id" }, { "table": "dv", "column": "id", "alias": "device_id" }, { "table": "dv", "column": "serial_number" }, { "table": "dv", "column": "asset_tag" }, { "table": "mf", "column": "name", "alias": "manufacturer" }, { "table": "m", "column": "model_name", "alias": "model" }, { "table": "c", "column": "name", "alias": "condition" }, { "table": "ls", "column": "code", "alias": "lifecycle" }, { "table": "da", "column": "district_id" }, { "table": "d", "column": "name", "alias": "district_name" }, { "table": "sha", "column": "school_id" }, { "table": "s", "column": "name", "alias": "school_name" }, { "table": "st", "column": "id", "alias": "student_id" }, { "table": "st", "column": "student_reference" }, { "table": "st", "column": "first_name" }, { "table": "st", "column": "last_name" }, { "table": "a", "column": "assignment_type" }, { "table": "a", "column": "assigned_at" }, { "table": "u", "column": "display_name", "alias": "assigned_by" }, { "table": "a", "column": "returned_at" }, { "table": "a", "column": "return_reason" }, { "table": "a", "column": "active_record_key", "alias": "is_active" }, { "table": "cc", "column": "current_custody_level" }],
+      "wheres": { "condition": "AND", "rules": [{ "data": { "table": "a", "column": "id" }, "operation": "=", "value": "{{$_GET.id}}" }] }
+    } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!assignment.student_assignment_id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Student assignment was not found." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(assignment.district_id) && !scope_context.schools.flatten('id').contains(assignment.school_id)}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "assignment": "{{assignment}}" } } }
+  ], "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Student assignment detail could not be loaded." } } }] } }
+}

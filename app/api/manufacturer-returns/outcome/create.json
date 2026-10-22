@@ -1,0 +1,644 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "manufacturer_return_case_id",
+        "type": "number"
+      },
+      {
+        "name": "outcome_code",
+        "type": "text"
+      },
+      {
+        "name": "outcome_date",
+        "type": "text"
+      },
+      {
+        "name": "manufacturer_resolution_reference",
+        "type": "text"
+      },
+      {
+        "name": "reason",
+        "type": "text"
+      },
+      {
+        "name": "notes",
+        "type": "text"
+      },
+      {
+        "name": "serial_number",
+        "type": "text"
+      },
+      {
+        "name": "manufacturer_model_reference",
+        "type": "text"
+      },
+      {
+        "name": "resolved_model_id",
+        "type": "number"
+      },
+      {
+        "name": "model_description",
+        "type": "text"
+      },
+      {
+        "name": "manufacturer_warranty_reference",
+        "type": "text"
+      },
+      {
+        "name": "warranty_start",
+        "type": "text"
+      },
+      {
+        "name": "warranty_end",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "manufacturer_returns.record_outcome"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+            "if": "{{!$_POST.manufacturer_return_case_id || !['REPAIRED_ORIGINAL','REPLACEMENT_SUPPLIED','WARRANTY_REJECTED','BEYOND_ECONOMICAL_REPAIR'].contains($_POST.outcome_code) || !$_POST.outcome_date || ($_POST.reason && $_POST.reason.length > 1000) || ($_POST.notes && $_POST.notes.length > 4000) || ($_POST.manufacturer_resolution_reference && $_POST.manufacturer_resolution_reference.length > 180) || ($_POST.outcome_code == 'REPLACEMENT_SUPPLIED' && (!$_POST.serial_number || !$_POST.serial_number.trim() || $_POST.serial_number.length > 150 || (!$_POST.manufacturer_model_reference && !$_POST.model_description))) || (['WARRANTY_REJECTED','BEYOND_ECONOMICAL_REPAIR'].contains($_POST.outcome_code) && (!$_POST.reason || !$_POST.reason.trim())) || ($_POST.outcome_code == 'BEYOND_ECONOMICAL_REPAIR' && !($_POST.notes || '').trim())}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Provide a valid outcome and all required outcome-specific details."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "name": "outcome_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_cases",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "exception_case_id"
+                      },
+                      {
+                        "column": "manufacturer_id"
+                      },
+                      {
+                        "column": "repair_centre_location_id"
+                      },
+                      {
+                        "column": "current_status_code"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.manufacturer_return_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "scope",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_service_location_scopes",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "service_location_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.repair_centre_location_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "latest_outcome",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_outcomes",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "manufacturer_return_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        }
+                      ]
+                    },
+                    "orders": [
+                      {
+                        "column": "created_at",
+                        "direction": "desc"
+                      },
+                      {
+                        "column": "id",
+                        "direction": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.id || (permission.bypass != 'SUPER_ADMIN' && !scope.id)}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8B_OUTCOME_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{current.current_status_code != 'AT_MANUFACTURER' || latest_outcome.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8B_OUTCOME_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{$_POST.outcome_code == 'REPLACEMENT_SUPPLIED'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "existing_device",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "devices",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "serial_number"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{($_POST.serial_number || '').trim().uppercase()}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{existing_device.id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "P8B_OUTCOME_DUPLICATE_SERIAL"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "outcome",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturer_return_outcomes",
+                    "values": [
+                      {
+                        "column": "manufacturer_return_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "outcome_code",
+                        "value": "{{$_POST.outcome_code}}"
+                      },
+                      {
+                        "column": "outcome_date",
+                        "value": "{{$_POST.outcome_date}}"
+                      },
+                      {
+                        "column": "manufacturer_resolution_reference",
+                        "value": "{{($_POST.manufacturer_resolution_reference || '').trim() || null}}"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "{{($_POST.reason || '').trim() || null}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "{{($_POST.notes || '').trim() || null}}"
+                      },
+                      {
+                        "column": "created_by",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{$_POST.outcome_code == 'REPLACEMENT_SUPPLIED'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "staged_serial",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "manufacturer_supplied_units",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "normalized_serial_number"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{($_POST.serial_number || '').trim().uppercase()}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{staged_serial.id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "P8B_OUTCOME_DUPLICATE_SERIAL"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "unit",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "manufacturer_supplied_units",
+                            "values": [
+                              {
+                                "column": "manufacturer_return_case_id",
+                                "value": "{{current.id}}"
+                              },
+                              {
+                                "column": "manufacturer_return_outcome_id",
+                                "value": "{{outcome.identity}}"
+                              },
+                              {
+                                "column": "manufacturer_id",
+                                "value": "{{current.manufacturer_id}}"
+                              },
+                              {
+                                "column": "serial_number",
+                                "value": "{{$_POST.serial_number.trim()}}"
+                              },
+                              {
+                                "column": "normalized_serial_number",
+                                "value": "{{$_POST.serial_number.trim().uppercase()}}"
+                              },
+                              {
+                                "column": "manufacturer_model_reference",
+                                "value": "{{($_POST.manufacturer_model_reference || '').trim() || null}}"
+                              },
+                              {
+                                "column": "resolved_model_id",
+                                "value": "{{$_POST.resolved_model_id || null}}"
+                              },
+                              {
+                                "column": "model_description",
+                                "value": "{{($_POST.model_description || '').trim() || null}}"
+                              },
+                              {
+                                "column": "manufacturer_warranty_reference",
+                                "value": "{{($_POST.manufacturer_warranty_reference || '').trim() || null}}"
+                              },
+                              {
+                                "column": "warranty_start",
+                                "value": "{{$_POST.warranty_start || null}}"
+                              },
+                              {
+                                "column": "warranty_end",
+                                "value": "{{$_POST.warranty_end || null}}"
+                              },
+                              {
+                                "column": "created_by",
+                                "value": "{{identity}}"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "manufacturer_outcome_recorded"
+                      },
+                      {
+                        "column": "module",
+                        "value": "manufacturer_returns"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "manufacturer_return_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Manufacturer outcome recorded by Repair Centre."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "outcome_id": "{{outcome.identity}}",
+            "outcome_code": "{{$_POST.outcome_code}}",
+            "staged_unit": "{{$_POST.outcome_code == 'REPLACEMENT_SUPPLIED'}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8B_OUTCOME_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8B_OUTCOME_DUPLICATE_SERIAL' || $_EXCEPTION.code == 'ER_DUP_ENTRY'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "The supplied serial number already exists in the device register or staged replacement records."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8B_OUTCOME_STATE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "An outcome has already been recorded or the manufacturer return is no longer awaiting an outcome."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Manufacturer outcome could not be recorded. No partial changes were committed."
+          }
+        }
+      }
+    ]
+  }
+}

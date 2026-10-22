@@ -1,0 +1,496 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "name": "evaluation_at",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "evaluation_at",
+          "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+        }
+      },
+      {
+        "name": "open_instances",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_sla_evaluation_queue",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "policy_code_snapshot"
+              },
+              {
+                "column": "current_state_code"
+              },
+              {
+                "column": "due_at"
+              },
+              {
+                "column": "at_risk_at"
+              },
+              {
+                "column": "source_entity_type"
+              },
+              {
+                "column": "source_entity_id"
+              },
+              {
+                "column": "evaluation_business_datetime"
+              },
+              {
+                "column": "due_business_date"
+              },
+              {
+                "column": "evaluation_business_date"
+              },
+              {
+                "column": "is_at_risk"
+              },
+              {
+                "column": "is_breached"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "current_state_code"
+                      },
+                      "operation": "=",
+                      "value": "ACTIVE"
+                    },
+                    {
+                      "data": {
+                        "column": "current_state_code"
+                      },
+                      "operation": "=",
+                      "value": "AT_RISK"
+                    }
+                  ]
+                },
+                {
+                  "data": {
+                    "column": "timezone_resolution_error"
+                  },
+                  "operation": "=",
+                  "value": 0
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "due_at",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "timezone_errors",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_sla_evaluation_queue",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "policy_code_snapshot"
+              },
+              {
+                "column": "calendar_id"
+              },
+              {
+                "column": "timezone_name"
+              },
+              {
+                "column": "due_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "current_state_code"
+                      },
+                      "operation": "=",
+                      "value": "ACTIVE"
+                    },
+                    {
+                      "data": {
+                        "column": "current_state_code"
+                      },
+                      "operation": "=",
+                      "value": "AT_RISK"
+                    }
+                  ]
+                },
+                {
+                  "data": {
+                    "column": "timezone_resolution_error"
+                  },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "evaluate_each",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{open_instances}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "transition_due",
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{is_breached == 1 || is_at_risk == 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "target_state",
+                        "module": "core",
+                        "action": "setvalue",
+                        "output": true,
+                        "options": {
+                          "key": "target_state",
+                          "value": "{{is_breached == 1 ? 'BREACHED' : 'AT_RISK'}}"
+                        }
+                      },
+                      {
+                        "name": "transition_transaction",
+                        "module": "dbupdater",
+                        "action": "transaction",
+                        "options": {
+                          "connection": "db",
+                          "exec": {
+                            "steps": [
+                              {
+                                "name": "state_update",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "sla_instances",
+                                    "values": [
+                                      {
+                                        "column": "current_state_code",
+                                        "value": "{{target_state}}"
+                                      },
+                                      {
+                                        "column": "at_risk_at",
+                                        "value": "{{target_state == 'AT_RISK' ? evaluation_at : at_risk_at}}"
+                                      },
+                                      {
+                                        "column": "breached_at",
+                                        "value": "{{target_state == 'BREACHED' ? evaluation_at : breached_at}}"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "current_state_code"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{current_state_code}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "completed_at"
+                                          },
+                                          "operator": "is_null"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "cancelled_at"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{state_update.affected == 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "name": "state_event",
+                                        "module": "dbupdater",
+                                        "action": "insert",
+                                        "output": true,
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "sla_instance_events",
+                                            "values": [
+                                              {
+                                                "column": "sla_instance_id",
+                                                "value": "{{id}}"
+                                              },
+                                              {
+                                                "column": "event_code",
+                                                "value": "{{target_state == 'AT_RISK' ? 'AT_RISK' : 'BREACHED'}}"
+                                              },
+                                              {
+                                                "column": "from_state_code",
+                                                "value": "{{current_state_code}}"
+                                              },
+                                              {
+                                                "column": "to_state_code",
+                                                "value": "{{target_state}}"
+                                              },
+                                              {
+                                                "column": "event_at",
+                                                "value": "{{evaluation_at}}"
+                                              },
+                                              {
+                                                "column": "source_entity_type",
+                                                "value": "{{source_entity_type}}"
+                                              },
+                                              {
+                                                "column": "source_entity_id",
+                                                "value": "{{source_entity_id}}"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{target_state == 'AT_RISK'}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "name": "open_escalation",
+                                                "module": "core",
+                                                "action": "exec",
+                                                "output": true,
+                                                "options": {
+                                                  "exec": "escalation_open",
+                                                  "params": {
+                                                    "sla_instance_id": "{{id}}",
+                                                    "sla_event_id": "{{state_event.identity}}",
+                                                    "event_at": "{{evaluation_at}}",
+                                                    "actor_user_id": null
+                                                  }
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{target_state == 'BREACHED'}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "name": "promote_escalation",
+                                                "module": "core",
+                                                "action": "exec",
+                                                "output": true,
+                                                "options": {
+                                                  "exec": "escalation_promote",
+                                                  "params": {
+                                                    "sla_instance_id": "{{id}}",
+                                                    "sla_event_id": "{{state_event.identity}}",
+                                                    "event_at": "{{evaluation_at}}",
+                                                    "actor_user_id": null
+                                                  }
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "name": "state_audit",
+                                        "module": "dbupdater",
+                                        "action": "insert",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "audit_logs",
+                                            "values": [
+                                              {
+                                                "column": "actor_user_id",
+                                                "value": null
+                                              },
+                                              {
+                                                "column": "action",
+                                                "value": "{{target_state == 'AT_RISK' ? 'sla_at_risk' : 'sla_breached'}}"
+                                              },
+                                              {
+                                                "column": "module",
+                                                "value": "sla"
+                                              },
+                                              {
+                                                "column": "entity_type",
+                                                "value": "sla_instance"
+                                              },
+                                              {
+                                                "column": "entity_id",
+                                                "value": "{{id}}"
+                                              },
+                                              {
+                                                "column": "description",
+                                                "value": "{{policy_code_snapshot + ' SLA transitioned to ' + target_state + ' during evaluation.'}}"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{state_update.affected == 1}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "notification_escalation",
+                                "module": "dbconnector",
+                                "action": "single",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "escalation_cases",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "sla_instance_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "name": "notify_transition",
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{notification_escalation.id}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "name": "notification_result",
+                                        "module": "core",
+                                        "action": "exec",
+                                        "output": true,
+                                        "options": {
+                                          "exec": "notification_from_escalation",
+                                          "params": {
+                                            "escalation_case_id": "{{notification_escalation.id}}",
+                                            "event_type_code": "{{target_state == 'AT_RISK' ? 'SLA_AT_RISK' : 'SLA_BREACHED'}}",
+                                            "actor_user_id": null
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "evaluated_count",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "evaluated_count",
+          "value": "{{open_instances.length}}"
+        }
+      },
+      {
+        "name": "timezone_configuration_error_count",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "timezone_configuration_error_count",
+          "value": "{{timezone_errors.length}}"
+        }
+      }
+    ]
+  }
+}

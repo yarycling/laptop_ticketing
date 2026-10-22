@@ -1,0 +1,280 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "sla.view"
+          }
+        }
+      },
+      {
+        "name": "filtered_calendars",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "sla_calendars",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "calendar_code"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "timezone_name"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "is_default"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search != null && $_GET.search != ''}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "calendar_code"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "description"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status != null && $_GET.status != ''}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "is_default",
+                "direction": "desc"
+              },
+              {
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "calendars",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "sla_calendars",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "calendar_code"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "timezone_name"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "is_default"
+              }
+            ],
+            "orders": [
+              {
+                "column": "is_default",
+                "direction": "desc"
+              },
+              {
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "weekdays",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "sla_calendar_weekdays",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "calendar_id"
+              },
+              {
+                "column": "weekday_number"
+              },
+              {
+                "column": "weekday_name"
+              },
+              {
+                "column": "is_business_day"
+              }
+            ],
+            "orders": [
+              {
+                "column": "calendar_id",
+                "direction": "asc"
+              },
+              {
+                "column": "weekday_number",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "overrides",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "sla_calendar_overrides",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "calendar_id"
+              },
+              {
+                "column": "override_date"
+              },
+              {
+                "column": "override_type"
+              },
+              {
+                "column": "is_business_day"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "updated_at"
+              }
+            ],
+            "orders": [
+              {
+                "column": "override_date",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "calendars": "{{calendars}}",
+            "weekdays": "{{weekdays}}",
+            "overrides": "{{overrides}}",
+            "filtered_calendars": "{{filtered_calendars}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Business calendars could not be loaded."
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      }
+    ]
+  }
+}

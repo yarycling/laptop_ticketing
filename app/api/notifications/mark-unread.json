@@ -1,0 +1,18 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [{ "name": "recipient_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.respond" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_POST.recipient_id || $_POST.recipient_id < 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "A valid notification is required." } } }] } } },
+    { "name": "own_recipient", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "notification_recipients", "columns": [{ "column": "id" }, { "column": "read_at" }, { "column": "notification_event_id" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.recipient_id}}" }, { "data": { "column": "user_id" }, "operation": "=", "value": "{{identity}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!own_recipient.id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Notification was not found." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{own_recipient.read_at}}", "then": { "steps": [
+      { "name": "mark_unread_transaction", "module": "dbupdater", "action": "transaction", "output": true, "options": { "connection": "db", "exec": { "steps": [
+        { "name": "mark_unread", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "notification_recipients", "values": [{ "column": "read_at", "value": null }, { "column": "read_by", "value": null }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{own_recipient.id}}" }, { "data": { "column": "user_id" }, "operation": "=", "value": "{{identity}}" }] } } } },
+        { "module": "core", "action": "condition", "options": { "if": "{{mark_unread.affected == 1}}", "then": { "steps": [{ "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "notification_marked_unread" }, { "column": "module", "value": "notifications" }, { "column": "entity_type", "value": "notification_event" }, { "column": "entity_id", "value": "{{own_recipient.notification_event_id}}" }, { "column": "description", "value": "Marked own notification as unread." }] } } }] } } }
+      ] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "already_unread": "{{own_recipient.read_at == null}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Notification could not be marked unread." } } }] }
+}

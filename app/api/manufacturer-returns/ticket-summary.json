@@ -1,0 +1,13 @@
+{
+ "settings":{"options":{"method":"get","nocsrf":true}},"meta":{"$_GET":[{"name":"ticket_id","type":"number"}]},
+ "exec":{"steps":[
+  {"name":"permission","module":"core","action":"exec","options":{"exec":"security_require_permission","params":{"permission":"tickets.view"}}},
+  {"name":"identity","module":"auth","action":"identify","options":{"provider":"portalSecurity"}},
+  {"name":"scope_context","module":"core","action":"exec","output":true,"options":{"exec":"security_get_scope_context","params":{}}},
+  {"module":"core","action":"condition","options":{"if":"{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}","then":{"steps":[{"module":"core","action":"response","options":{"status":403,"data":{"success":false,"error":"Forbidden."}}}]} }},
+  {"name":"ticket","module":"dbconnector","action":"single","output":true,"options":{"connection":"db","sql":{"table":"tickets","columns":[{"column":"id"},{"column":"origin_district_id"},{"column":"origin_school_id"}],"wheres":{"condition":"AND","rules":[{"data":{"column":"id"},"operation":"=","value":"{{$_GET.ticket_id}}"}]}}}},
+  {"module":"core","action":"condition","options":{"if":"{{!ticket.id || (permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(ticket.origin_district_id) && !scope_context.schools.flatten('id').contains(ticket.origin_school_id))}}","then":{"steps":[{"module":"core","action":"response","options":{"status":403,"data":{"success":false,"error":"Forbidden."}}}]} }},
+  {"name":"summary","module":"dbconnector","action":"single","output":true,"options":{"connection":"db","sql":{"table":"v_manufacturer_return_queue","columns":[{"column":"manufacturer_return_case_id"},{"column":"manufacturer_return_number"},{"column":"ticket_id"},{"column":"manufacturer_name"},{"column":"manufacturer_return_status_name"},{"column":"physical_custody_code"},{"column":"current_outcome_name"}],"wheres":{"condition":"AND","rules":[{"data":{"column":"ticket_id"},"operation":"=","value":"{{ticket.id}}"}]}}}},
+  {"module":"core","action":"response","options":{"status":200,"data":{"success":true,"summary":"{{summary}}"}}}
+ ],"catch":[{"module":"core","action":"response","options":{"status":500,"data":{"success":false,"error":"Manufacturer return summary could not be loaded."}}}]}
+}

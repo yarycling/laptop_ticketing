@@ -1,0 +1,35 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "dbupdater",
+        "action": "insert",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "audit_logs",
+            "values": [
+              { "column": "actor_user_id", "value": "{{$_PARAM.actor_user_id || null}}" },
+              { "column": "action", "value": "repair_sla_side_effect_failed" },
+              { "column": "module", "value": "repairs" },
+              { "column": "entity_type", "value": "repair_job" },
+              { "column": "entity_id", "value": "{{$_PARAM.repair_job_id}}" },
+              { "column": "description", "value": "Repair completion committed, but a derived repair or return SLA operation failed. Ticket ID {{$_PARAM.ticket_id}}." }
+            ]
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "repair_sla_failure_audit_unavailable",
+          "value": true
+        }
+      }
+    ]
+  }
+}

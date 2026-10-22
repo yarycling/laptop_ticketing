@@ -1,0 +1,24 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "search", "type": "text" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "device_stock.view" } } },
+    { "name": "scope_context", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_get_scope_context", "params": {} } },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length == 0}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "name": "stock", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_device_stock_queue", "alias": "q" },
+      "columns": [{ "table": "q", "column": "stock_location_id" }, { "table": "q", "column": "device_id" }, { "table": "q", "column": "serial_number" }, { "table": "q", "column": "asset_tag" }, { "table": "q", "column": "manufacturer_name" }, { "table": "q", "column": "model_name" }, { "table": "q", "column": "lifecycle_code" }, { "table": "q", "column": "allocation_level" }, { "table": "q", "column": "district_name" }, { "table": "q", "column": "school_name" }, { "table": "q", "column": "service_location_id" }, { "table": "q", "column": "service_location_name" }, { "table": "q", "column": "stock_status" }, { "table": "q", "column": "physical_custody_code" }, { "table": "q", "column": "physical_custody_name" }, { "table": "q", "column": "placed_at" }, { "table": "q", "column": "is_reserved_for_replacement" }, { "table": "q", "column": "replacement_case_id" }, { "table": "prc", "column": "replacement_number" }],
+      "joins": [{ "table": "permanent_replacement_cases", "alias": "prc", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "prc", "column": "id", "operation": "=", "value": { "table": "q", "column": "replacement_case_id" } }] } }],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "q", "column": "stock_location_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}", "rules": [{ "data": { "table": "q", "column": "service_location_id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] }
+        ] },
+        { "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [{ "data": { "table": "q", "column": "serial_number" }, "operator": "contains", "value": "{{$_GET.search}}" }, { "data": { "table": "q", "column": "asset_tag" }, "operator": "contains", "value": "{{$_GET.search}}" }] }
+      ] },
+      "orders": [{ "table": "q", "column": "placed_at", "direction": "desc" }, { "table": "q", "column": "stock_location_id", "direction": "desc" }]
+    } } },
+    { "name": "display_stock", "module": "core", "action": "repeat", "options": { "repeat": "{{stock}}", "outputFilter": "exclude", "outputFields": [], "exec": { "steps": [{ "name": "placed_at_display", "module": "core", "action": "setvalue", "output": true, "options": { "key": "placed_at_display", "value": "{{placed_at ? placed_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}" } }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "stock": "{{display_stock}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Repair Centre stock could not be loaded." } } }] }
+}

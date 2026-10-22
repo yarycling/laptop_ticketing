@@ -1,0 +1,681 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "serial_number",
+        "type": "text"
+      },
+      {
+        "name": "asset_tag",
+        "type": "text"
+      },
+      {
+        "name": "device_model_id",
+        "type": "number"
+      },
+      {
+        "name": "condition_id",
+        "type": "number"
+      },
+      {
+        "name": "warranty_start_date",
+        "type": "text"
+      },
+      {
+        "name": "warranty_end_date",
+        "type": "text"
+      },
+      {
+        "name": "received_date",
+        "type": "text"
+      },
+      {
+        "name": "procurement_reference",
+        "type": "text"
+      },
+      {
+        "name": "supplier_name",
+        "type": "text"
+      },
+      {
+        "name": "warranty_reference",
+        "type": "text"
+      },
+      {
+        "name": "notes",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{require_permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "serial_number",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "serial_number",
+          "value": "{{($_POST.serial_number || '').trim().uppercase()}}"
+        }
+      },
+      {
+        "name": "asset_tag",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "asset_tag",
+          "value": "{{($_POST.asset_tag || '').trim().uppercase() || null}}"
+        }
+      },
+      {
+        "name": "procurement_reference",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "procurement_reference",
+          "value": "{{($_POST.procurement_reference || '').trim() || null}}"
+        }
+      },
+      {
+        "name": "supplier_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "supplier_name",
+          "value": "{{($_POST.supplier_name || '').trim() || null}}"
+        }
+      },
+      {
+        "name": "warranty_reference",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "warranty_reference",
+          "value": "{{($_POST.warranty_reference || '').trim() || null}}"
+        }
+      },
+      {
+        "name": "notes",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "notes",
+          "value": "{{($_POST.notes || '').trim() || null}}"
+        }
+      },
+      {
+        "name": "date_validation",
+        "module": "validator",
+        "action": "validate",
+        "options": {
+          "noError": true,
+          "data": [
+            {
+              "name": "warranty_start_date",
+              "value": "{{$_POST.warranty_start_date}}",
+              "rules": {
+                "core:date": {
+                  "message": "Enter a valid warranty start date."
+                }
+              }
+            },
+            {
+              "name": "warranty_end_date",
+              "value": "{{$_POST.warranty_end_date}}",
+              "rules": {
+                "core:date": {
+                  "message": "Enter a valid warranty end date."
+                }
+              }
+            },
+            {
+              "name": "received_date",
+              "value": "{{$_POST.received_date}}",
+              "rules": {
+                "core:date": {
+                  "message": "Enter a valid received date."
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!serial_number || serial_number.length() > 150 || !$_POST.device_model_id || $_POST.device_model_id < 1 || !$_POST.condition_id || $_POST.condition_id < 1 || (asset_tag && asset_tag.length() > 120) || (procurement_reference && procurement_reference.length() > 180) || (supplier_name && supplier_name.length() > 180) || (warranty_reference && warranty_reference.length() > 180) || !date_validation || ($_POST.warranty_start_date && $_POST.warranty_end_date && $_POST.warranty_end_date < $_POST.warranty_start_date)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Check the required fields, field lengths, and warranty dates."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "serial_match",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "devices",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "serial_number"
+                  },
+                  "operation": "=",
+                  "value": "{{serial_number}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{serial_match.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "A device with this serial number already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{asset_tag}}",
+          "then": {
+            "steps": [
+              {
+                "name": "asset_match",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "devices",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "condition": "AND",
+                          "conditional": "{{asset_tag}}",
+                          "rules": [
+                            {
+                              "data": {
+                                "column": "asset_tag"
+                              },
+                              "operation": "=",
+                              "value": "{{asset_tag}}"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{asset_tag && asset_match.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "A device with this asset tag already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "model",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "device_models",
+              "alias": "m"
+            },
+            "columns": [
+              {
+                "table": "m",
+                "column": "id"
+              },
+              {
+                "table": "m",
+                "column": "status"
+              },
+              {
+                "table": "mf",
+                "column": "status",
+                "alias": "manufacturer_status"
+              }
+            ],
+            "joins": [
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "m",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.device_model_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "condition_record",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "device_conditions",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.condition_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!model.id || model.status != 'active' || model.manufacturer_status != 'active' || !condition_record.id || condition_record.status != 'active'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Select an active model, manufacturer, and condition."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "received_lifecycle",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "device_lifecycle_statuses",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "RECEIVED"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!received_lifecycle.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 500,
+                  "data": {
+                    "success": false,
+                    "error": "The initial device lifecycle is unavailable."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "save_device",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "create_device",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "devices",
+                    "values": [
+                      {
+                        "column": "serial_number",
+                        "value": "{{serial_number}}"
+                      },
+                      {
+                        "column": "asset_tag",
+                        "value": "{{asset_tag}}"
+                      },
+                      {
+                        "column": "device_model_id",
+                        "value": "{{$_POST.device_model_id}}"
+                      },
+                      {
+                        "column": "condition_id",
+                        "value": "{{$_POST.condition_id}}"
+                      },
+                      {
+                        "column": "lifecycle_status_id",
+                        "value": "{{received_lifecycle.id}}"
+                      },
+                      {
+                        "column": "warranty_start_date",
+                        "value": "{{$_POST.warranty_start_date || null}}"
+                      },
+                      {
+                        "column": "warranty_end_date",
+                        "value": "{{$_POST.warranty_end_date || null}}"
+                      },
+                      {
+                        "column": "received_date",
+                        "value": "{{$_POST.received_date || null}}"
+                      },
+                      {
+                        "column": "procurement_reference",
+                        "value": "{{procurement_reference}}"
+                      },
+                      {
+                        "column": "supplier_name",
+                        "value": "{{supplier_name}}"
+                      },
+                      {
+                        "column": "warranty_reference",
+                        "value": "{{warranty_reference}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "{{notes}}"
+                      },
+                      {
+                        "column": "created_by_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit_device_created",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "device_created"
+                      },
+                      {
+                        "column": "module",
+                        "value": "devices"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "device"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{create_device.identity}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Device asset created."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 201,
+          "data": {
+            "success": true,
+            "id": "{{create_device.identity}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A device with this serial number or asset tag already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "escalations.view" } } },
+    { "name": "scope_context", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_get_scope_context", "params": {} } },
+    { "name": "roles", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "roles", "columns": [{ "column": "name" }, { "column": "label" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "name" }, "operation": "in", "value": "{{['TTPOST_LOGISTICS','REPAIR_CENTRE','MOE_HEAD_OFFICE']}}" }] }, "orders": [{ "column": "label", "direction": "asc" }] } } },
+    { "name": "policies", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "sla_policies", "columns": [{ "column": "policy_code" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "policy_code" }, "operation": "!=", "value": "QA" }] }, "orders": [{ "column": "policy_code", "direction": "asc" }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "states": "{{['OPEN','ACKNOWLEDGED','RESOLVED','CANCELLED']}}", "triggers": "{{['AT_RISK','BREACHED']}}", "levels": "{{[1,2]}}", "roles": "{{roles}}", "policies": "{{policies}}", "districts": "{{scope_context.districts}}", "schools": "{{scope_context.schools}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Escalation filters could not be loaded." } } }] }
+}

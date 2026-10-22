@@ -1,0 +1,551 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "exception_case_id",
+        "type": "number"
+      },
+      {
+        "name": "action_code",
+        "type": "text"
+      },
+      {
+        "name": "reason",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "exceptions.head_office_approve"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.exception_case_id || $_POST.exception_case_id < 1 || !['APPROVE_REPLACEMENT','RETURN_FOR_REVIEW'].contains($_POST.action_code) || ($_POST.reason && $_POST.reason.length > 1000) || ($_POST.action_code == 'RETURN_FOR_REVIEW' && (!$_POST.reason || !$_POST.reason.trim()))}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose an allowed Head Office action and provide a reason when returning a case for review."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "head_office_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "repair_exception_cases",
+                      "alias": "ec"
+                    },
+                    "columns": [
+                      {
+                        "table": "ec",
+                        "column": "id"
+                      },
+                      {
+                        "table": "ec",
+                        "column": "current_status_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "ticket_status_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "logistics_status_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "physical_state_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "device_lifecycle_code"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "v_repair_current_context",
+                        "alias": "ctx",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "ctx",
+                              "column": "logistics_case_id",
+                              "operation": "=",
+                              "value": {
+                                "table": "ec",
+                                "column": "logistics_case_id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "ec",
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.exception_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "replacement_outcome",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "manufacturer_return_cases",
+                      "alias": "mrc"
+                    },
+                    "columns": [
+                      {
+                        "table": "mrc",
+                        "column": "id"
+                      },
+                      {
+                        "table": "o",
+                        "column": "outcome_code"
+                      },
+                      {
+                        "table": "su",
+                        "column": "received_at"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "manufacturer_return_outcomes",
+                        "alias": "o",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "o",
+                              "column": "manufacturer_return_case_id",
+                              "operation": "=",
+                              "value": {
+                                "table": "mrc",
+                                "column": "id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "manufacturer_supplied_units",
+                        "alias": "su",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "su",
+                              "column": "manufacturer_return_case_id",
+                              "operation": "=",
+                              "value": {
+                                "table": "mrc",
+                                "column": "id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "mrc",
+                            "column": "exception_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.exception_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "mrc",
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "COMPLETED"
+                        },
+                        {
+                          "data": {
+                            "table": "mrc",
+                            "column": "active_record_key"
+                          },
+                          "operator": "is_null"
+                        },
+                        {
+                          "data": {
+                            "table": "o",
+                            "column": "outcome_code"
+                          },
+                          "operation": "=",
+                          "value": "REPLACEMENT_SUPPLIED"
+                        },
+                        {
+                          "data": {
+                            "table": "su",
+                            "column": "received_at"
+                          },
+                          "operator": "is_not_null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_HEAD_OFFICE_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.id || current.current_status_code != 'PENDING_HEAD_OFFICE_APPROVAL' || current.ticket_status_code != 'UNDER_REPAIR' || current.logistics_status_code != 'AT_REPAIR_CENTRE' || current.physical_state_code != 'REPAIR_CENTRE_CUSTODY' || (current.device_lifecycle_code != 'IN_REPAIR' && !(replacement_outcome.id && current.device_lifecycle_code == 'MANUFACTURER_RETURN'))}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_HEAD_OFFICE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "target_status",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "target_status",
+                  "value": "{{$_POST.action_code == 'APPROVE_REPLACEMENT' ? 'REPLACEMENT_APPROVED' : 'REPAIR_CENTRE_REVIEW_REQUIRED'}}"
+                }
+              },
+              {
+                "name": "update_case",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "repair_exception_cases",
+                    "values": [
+                      {
+                        "column": "current_status_code",
+                        "value": "{{target_status}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "PENDING_HEAD_OFFICE_APPROVAL"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{update_case.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_HEAD_OFFICE_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "status_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "exception_case_status_history",
+                    "values": [
+                      {
+                        "column": "exception_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": "PENDING_HEAD_OFFICE_APPROVAL"
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "{{target_status}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "{{($_POST.reason || '').trim() || null}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "decision",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "exception_decisions",
+                    "values": [
+                      {
+                        "column": "exception_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "decision_type_code",
+                        "value": "{{$_POST.action_code == 'APPROVE_REPLACEMENT' ? 'HEAD_OFFICE_REPLACEMENT_APPROVAL' : 'RETURN_FOR_REVIEW'}}"
+                      },
+                      {
+                        "column": "decision_code",
+                        "value": "{{$_POST.action_code == 'APPROVE_REPLACEMENT' ? 'APPROVED' : 'RETURNED'}}"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "{{($_POST.reason || '').trim() || null}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "{{$_POST.action_code == 'APPROVE_REPLACEMENT' ? 'exception_replacement_approved' : 'exception_returned_for_review'}}"
+                      },
+                      {
+                        "column": "module",
+                        "value": "exceptions"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "repair_exception_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "{{$_POST.action_code == 'APPROVE_REPLACEMENT' ? 'Head Office approved permanent replacement; replacement processing is pending.' : 'Exception case returned to Repair Centre for review.'}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "exception_case_id": "{{$_POST.exception_case_id}}",
+            "status": "{{target_status}}",
+            "replacement_device_selected": false
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8A_HEAD_OFFICE_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8A_HEAD_OFFICE_STATE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "The exception state changed or Head Office approval is not valid now. No changes were committed."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "The Head Office decision could not be recorded."
+          }
+        }
+      }
+    ]
+  }
+}

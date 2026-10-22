@@ -1,0 +1,104 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="students" appConnect="local" components="{dmxBootstrap5Alert:{},dmxBootstrap5Modal:{},dmxBootstrap5Toasts:{}}" -->
+<meta name="ac:route" content="/students">
+
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="scopeContext" url="/api/auth/scope_context"></dmx-serverconnect>
+  <dmx-serverconnect id="schoolOptions" url="/api/students/school-options"></dmx-serverconnect>
+  <dmx-value id="studentPage" value="1"></dmx-value>
+  <dmx-value id="selectedStudentId"></dmx-value>
+  <dmx-value id="selectedStudentSchoolId"></dmx-value>
+  <dmx-value id="selectedStudentReference"></dmx-value>
+  <dmx-value id="selectedStudentFirstName"></dmx-value>
+  <dmx-value id="selectedStudentLastName"></dmx-value>
+  <dmx-value id="selectedStudentSchoolStudentId"></dmx-value>
+  <dmx-value id="selectedStudentStartDate"></dmx-value>
+  <dmx-value id="selectedStudentSchoolName"></dmx-value>
+  <dmx-value id="selectedStudentDistrictName"></dmx-value>
+  <dmx-value id="statusStudentId"></dmx-value>
+  <dmx-value id="statusStudentValue"></dmx-value>
+  <dmx-bs5-toasts id="studentToast" position="top" align="right" delay="5000"></dmx-bs5-toasts>
+  <dmx-serverconnect id="studentList" url="/api/students/list" dmx-param:search="studentSearch.value" dmx-param:school_id="studentSchoolFilter.value" dmx-param:status="studentStatusFilter.value" dmx-param:page="studentPage.value"></dmx-serverconnect>
+
+
+  <%- await include("partials/portal-sidebar", { currentPage: "students" }) %>
+
+  <div class="portal-workspace">
+    <%- await include("partials/portal-topbar") %>
+    <main class="portal-main students-page" aria-label="Students">
+      <section class="students-hero" aria-labelledby="studentsPageTitle"><div class="students-hero-copy"><div class="students-eyebrow">DEVICES &amp; STUDENTS</div><h1 id="studentsPageTitle">Students</h1><p>Manage student records, view their device allocations and status across all schools.</p></div></section>
+      <div class="alert alert-danger students-error" role="alert" dmx-show="studentList.lastError.status" dmx-text="studentList.lastError.response && studentList.lastError.response.error ? studentList.lastError.response.error : 'Students could not be loaded.'"></div>
+      <div class="alert alert-danger students-error" role="alert" dmx-show="schoolOptions.lastError.status">School options could not be loaded.</div>
+      <section class="students-summary" aria-label="Student summary">
+        <article class="students-metric"><span class="students-metric-icon green"><i class="fas fa-users" aria-hidden="true"></i></span><div><span>Total visible</span><strong dmx-text="studentList.data.total || 0">0</strong><small>Students matching your filters</small></div><i class="students-metric-mark fas fa-users" aria-hidden="true"></i></article>
+        <article class="students-metric"><span class="students-metric-icon green"><i class="fas fa-user" aria-hidden="true"></i></span><div><span>Active</span><strong dmx-text="studentList.data.active || 0">0</strong><small>Students with active status</small></div><i class="students-metric-mark fas fa-circle" aria-hidden="true"></i></article>
+        <article class="students-metric"><span class="students-metric-icon slate"><i class="fas fa-user" aria-hidden="true"></i></span><div><span>Inactive</span><strong dmx-text="studentList.data.inactive || 0">0</strong><small>Students with inactive status</small></div><i class="students-metric-mark fas fa-circle" aria-hidden="true"></i></article>
+      </section>
+      <section class="students-list-card" aria-labelledby="studentsListTitle">
+        <div class="students-filter-row"><div class="students-search-wrap"><i class="fas fa-search" aria-hidden="true"></i><label class="visually-hidden" for="studentSearch">Search students</label><input id="studentSearch" class="form-control" type="search" placeholder="Search reference or name..." dmx-on:input="studentPage.setValue(1);studentList.load()"></div><div><label class="visually-hidden" for="studentSchoolFilter">School</label><select id="studentSchoolFilter" class="form-select" dmx-on:change="studentPage.setValue(1);studentList.load()"><option value="">All schools</option><option dmx-repeat="schoolOptions.data.schools" dmx-bind:value="id" dmx-text="name"></option></select></div><div><label class="visually-hidden" for="studentStatusFilter">Status</label><select id="studentStatusFilter" class="form-select" dmx-on:change="studentPage.setValue(1);studentList.load()"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div><button class="btn btn-bmobile-primary students-add-button" type="button" data-bs-toggle="modal" data-bs-target="#createStudentModal" dmx-show="authContext.data.can_students_manage" dmx-on:click="createStudentForm.reset(true)"><i class="fas fa-plus me-1" aria-hidden="true"></i>Add Student</button></div>
+        <div class="students-list-heading"><div><h2 id="studentsListTitle">Students (<span dmx-text="studentList.data.filtered || 0">0</span>)</h2><p dmx-text="studentList.data.filtered == 0 ? 'No students match the current filters.' : 'Student records within your authorized school scope.'">Student records within your authorized school scope.</p></div><div class="text-muted students-loading" role="status" dmx-show="studentList.state.executing"><i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Loading students...</div></div>
+        <div class="table-responsive portal-table-wrapper"><table class="table portal-table align-middle students-table"><thead><tr><th>Student Reference</th><th>Student Name</th><th>School</th><th class="d-none d-md-table-cell">District</th><th>Status</th><th>Actions</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="studentList.data.students"><tr><td class="students-reference" dmx-text="student_reference"></td><td dmx-text="first_name + ' ' + last_name"></td><td dmx-text="school_name"></td><td class="d-none d-md-table-cell" dmx-text="district_name"></td><td><span class="badge" dmx-class:text-bg-success="status == 'active'" dmx-class:text-bg-secondary="status == 'inactive'" dmx-text="status == 'active' ? 'Active' : 'Deactivated'"></span></td><td><div class="d-flex flex-wrap gap-1"><button class="btn btn-bmobile-secondary btn-sm" type="button" dmx-on:click="updateStudentForm.reset(true);selectedStudentId.setValue(id);selectedStudentSchoolId.setValue(school_id);selectedStudentReference.setValue(student_reference);selectedStudentFirstName.setValue(first_name);selectedStudentLastName.setValue(last_name);selectedStudentSchoolStudentId.setValue(school_student_id_number);selectedStudentStartDate.setValue(school_start_date);selectedStudentSchoolName.setValue(school_name);selectedStudentDistrictName.setValue(district_name);studentModal.show()" dmx-text="authContext.data.can_students_manage ? 'Edit' : 'View'">View</button><button class="btn btn-bmobile-secondary btn-sm" type="button" data-bs-toggle="modal" data-bs-target="#studentStatusModal" dmx-show="authContext.data.can_students_manage" dmx-on:click="statusStudentId.setValue(id);statusStudentValue.setValue(status == 'active' ? 'inactive' : 'active')" dmx-text="status == 'active' ? 'Deactivate' : 'Reactivate'"></button></div></td></tr></tbody></table></div>
+        <div class="students-empty-state" dmx-show="!studentList.state.executing && studentList.data.filtered == 0"><span><i class="far fa-file-alt" aria-hidden="true"></i><i class="fas fa-search students-empty-search" aria-hidden="true"></i></span><strong>No students match the current filters.</strong><p>Try adjusting your search or filter criteria to view student records.</p></div>
+        <div class="students-pagination"><span dmx-text="studentList.data.filtered == 0 ? 'Showing 0 of 0 students' : 'Showing ' + (((studentPage.value - 1) * 25) + 1) + ' to ' + (studentPage.value * 25 > studentList.data.filtered ? studentList.data.filtered : studentPage.value * 25) + ' of ' + studentList.data.filtered + ' students'"></span><div><button class="btn btn-bmobile-secondary btn-sm" type="button" dmx-bind:disabled="studentPage.value <= 1" dmx-on:click="studentPage.setValue(studentPage.value - 1);studentList.load()" aria-label="Previous page"><i class="fas fa-chevron-left" aria-hidden="true"></i></button><span dmx-text="'Page ' + studentPage.value"></span><button class="btn btn-bmobile-secondary btn-sm" type="button" dmx-bind:disabled="studentPage.value * 25 >= studentList.data.filtered" dmx-on:click="studentPage.setValue(studentPage.value * 1 + 1);studentList.load()" aria-label="Next page"><i class="fas fa-chevron-right" aria-hidden="true"></i></button></div></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+
+
+<div id="createStudentModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="createStudentTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content portal-modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="createStudentTitle">Add Student</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="createStudentForm" is="dmx-serverconnect-form" method="post" action="/api/students/create" dmx-on:success="studentToast.show({title:'Completed',message:'Student created successfully.'});createStudentModal.hide();studentList.load();createStudentForm.reset(true)">
+        <div class="modal-body">
+          <div class="alert alert-danger" role="alert" dmx-show="createStudentForm.lastError.status" dmx-text="createStudentForm.lastError.response && createStudentForm.lastError.response.error ? createStudentForm.lastError.response.error : 'Student could not be saved.'"></div><label class="form-label" for="createSchool">School</label><select id="createSchool" class="form-select mb-3" name="school_id" required dmx-bind:value="schoolOptions.data.schools && schoolOptions.data.schools.count() == 1 ? schoolOptions.data.schools.first().id : ''">
+            <option value="">Select school</option>
+            <option dmx-repeat="schoolOptions.data.schools" dmx-bind:value="id" dmx-text="name"></option>
+          </select><input id="createReference" type="hidden" name="student_reference" dmx-bind:value="((createFirstName.value || '').trim().substr(0, 1) + (createLastName.value || '').trim()).slugify().substr(0, 90)"><label class="form-label" for="createFirstName">First Name</label><input id="createFirstName" class="form-control mb-3" name="first_name" maxlength="100" required><label class="form-label" for="createLastName">Last Name</label><input id="createLastName" class="form-control mb-3" name="last_name" maxlength="100" required><label class="form-label" for="createSchoolStudentId">School ID Number</label><input id="createSchoolStudentId" class="form-control mb-3" name="school_student_id_number" maxlength="100"><label class="form-label" for="createSchoolStartDate">Date Started at School</label><input id="createSchoolStartDate" class="form-control" type="date" name="school_start_date">
+        </div>
+        <div class="modal-footer"><button class="btn btn-bmobile-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="createStudentForm.state.executing">Save</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="studentModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="studentModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content portal-modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="studentModalTitle" dmx-text="authContext.data.can_students_manage ? 'Edit Student' : 'Student'">Student</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="updateStudentForm" is="dmx-serverconnect-form" method="post" action="/api/students/update" dmx-on:success="studentToast.show({title:'Completed',message:'Student updated successfully.'});studentModal.hide();studentList.load();updateStudentForm.reset(true)">
+        <div class="modal-body">
+          <div class="alert alert-danger" role="alert" dmx-show="updateStudentForm.lastError.status" dmx-text="updateStudentForm.lastError.response && updateStudentForm.lastError.response.error ? updateStudentForm.lastError.response.error : 'Student could not be saved.'"></div>
+          <input id="editStudentId" type="hidden" name="id" dmx-bind:value="selectedStudentId.value"><label class="form-label" for="editSchool">School</label><select id="editSchool" class="form-select mb-1" name="school_id" required dmx-bind:value="selectedStudentSchoolId.value" dmx-bind:disabled="!authContext.data.can_students_manage">
+            <option value="">Select school</option>
+            <option dmx-repeat="schoolOptions.data.schools" dmx-bind:value="id" dmx-text="name"></option>
+          </select><small class="text-muted d-block mb-3" dmx-text="selectedStudentSchoolName.value + ' / ' + selectedStudentDistrictName.value"></small><label class="form-label" for="editReference">Student Reference</label><input id="editReference" class="form-control mb-3" readonly dmx-bind:value="selectedStudentReference.value"><label class="form-label" for="editFirstName">First Name</label><input id="editFirstName" class="form-control mb-3" name="first_name" maxlength="100" required dmx-bind:value="selectedStudentFirstName.value" dmx-bind:readonly="!authContext.data.can_students_manage"><label class="form-label" for="editLastName">Last Name</label><input id="editLastName" class="form-control mb-3" name="last_name" maxlength="100" required dmx-bind:value="selectedStudentLastName.value" dmx-bind:readonly="!authContext.data.can_students_manage"><label class="form-label" for="editSchoolStudentId">School ID Number</label><input id="editSchoolStudentId" class="form-control mb-3" name="school_student_id_number" maxlength="100" dmx-bind:value="selectedStudentSchoolStudentId.value" dmx-bind:readonly="!authContext.data.can_students_manage"><label class="form-label" for="editSchoolStartDate">Date Started at School</label><input id="editSchoolStartDate" class="form-control" type="date" name="school_start_date" dmx-bind:value="selectedStudentStartDate.value ? selectedStudentStartDate.value.formatDate('yyyy-MM-dd') : ''" dmx-bind:readonly="!authContext.data.can_students_manage">
+        </div>
+        <div class="modal-footer"><button class="btn btn-bmobile-secondary" type="button" dmx-on:click="studentModal.hide()">Close</button><button class="btn btn-bmobile-primary" type="submit" dmx-show="authContext.data.can_students_manage && selectedStudentId.value" dmx-bind:disabled="updateStudentForm.state.executing">Save</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="studentStatusModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="studentStatusTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content portal-modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="studentStatusTitle">Change Student Status</h2><button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="studentStatusForm" is="dmx-serverconnect-form" method="post" action="/api/students/set-status" dmx-on:success="studentToast.show({title:'Completed',message:statusStudentValue.value == 'inactive' ? 'Student deactivated successfully.' : 'Student activated successfully.'});studentStatusModal.hide();studentList.load();studentStatusForm.reset(true)">
+        <div class="modal-body"><input id="statusStudentIdInput" type="hidden" name="id" dmx-bind:value="statusStudentId.value"><input id="statusStudentValueInput" type="hidden" name="status" dmx-bind:value="statusStudentValue.value">
+          <p dmx-text="statusStudentValue.value == 'inactive' ? 'Deactivate this student?' : 'Reactivate this student?'">Change this student's status?</p>
+          <div class="alert alert-danger" role="alert" dmx-show="studentStatusForm.lastError.status" dmx-text="studentStatusForm.lastError.response && studentStatusForm.lastError.response.error ? studentStatusForm.lastError.response.error : 'Status could not be changed.'"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-bmobile-secondary" type="button" data-bs-dismiss="modal">Cancel</button><button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="studentStatusForm.state.executing">Confirm</button></div>
+      </form>
+    </div>
+  </div>
+</div>

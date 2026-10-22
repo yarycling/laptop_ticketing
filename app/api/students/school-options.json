@@ -1,0 +1,182 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": []
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "students.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "school_access",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_authorized_schools",
+          "params": {
+            "super_admin": "{{require_permission.bypass == 'SUPER_ADMIN'}}"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "schools",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "s",
+                "column": "school_code",
+                "alias": "school_code"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "name"
+              },
+              {
+                "table": "s",
+                "column": "district_id",
+                "alias": "district_id"
+              },
+              {
+                "table": "d",
+                "column": "name",
+                "alias": "district_name"
+              },
+              {
+                "table": "s",
+                "column": "status",
+                "alias": "status"
+              }
+            ],
+            "joins": [
+              {
+                "table": "districts",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "s",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "orders": [
+              {
+                "table": "s",
+                "column": "name",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "id"
+                  },
+                  "operator": "in",
+                  "value": "{{school_access.allowed_schools.flatten('id')}}"
+                },
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "schools": "{{schools}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

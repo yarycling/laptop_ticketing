@@ -1,0 +1,210 @@
+<!-- Wappler include head-page="../layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="organisation" appConnect="local" -->
+<meta name="ac:route" content="/admin/organisation">
+
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="scopeContext" url="/api/auth/scope_context"></dmx-serverconnect>
+  <dmx-serverconnect id="districtList" url="/api/admin/districts/list"></dmx-serverconnect>
+  <dmx-serverconnect id="schoolList" url="/api/admin/schools/list"></dmx-serverconnect>
+  <dmx-serverconnect id="schoolDetail" url="/api/admin/schools/detail" noload="true" dmx-on:success="portalSetSchoolForm(schoolDetail.data.school);schoolModalDistrictId.setValue(schoolDetail.data.school.district_id || '')"></dmx-serverconnect>
+  <dmx-serverconnect id="userSearch" url="/api/admin/user-scopes/user-search"></dmx-serverconnect>
+  <dmx-value id="selectedScopeUser"></dmx-value>
+  <dmx-value id="organisationTab" value="districts"></dmx-value>
+  <dmx-value id="districtModalMode" value="add"></dmx-value>
+  <dmx-value id="districtModalId"></dmx-value>
+  <dmx-value id="districtModalName"></dmx-value>
+  <dmx-value id="districtModalStatus" value="active"></dmx-value>
+  <dmx-value id="districtModalSchoolCount" value="0"></dmx-value>
+  <dmx-value id="districtDeleteConfirming" value="false"></dmx-value>
+  <dmx-value id="schoolModalMode" value="add"></dmx-value>
+  <dmx-value id="schoolModalDistrictId"></dmx-value>
+  <dmx-value id="schoolDeleteConfirming" value="false"></dmx-value>
+  <dmx-serverconnect id="scopeDetail" url="/api/admin/user-scopes/detail" noload="true" dmx-param:user_id="selectedScopeUser.value"></dmx-serverconnect> 
+  <dmx-serverconnect id="serviceLocationOptions" url="/api/admin/user-scopes/service-location-options"></dmx-serverconnect>
+
+  <%- await include("../partials/portal-sidebar", { currentPage: "administration" }) %>
+
+  
+
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar") %>
+
+    <main class="portal-main" aria-label="Organisation Administration">
+      <section class="dashboard-hero organisation-hero">
+        <div class="organisation-hero-content">
+          <span class="organisation-hero-eyebrow">Administration</span>
+          <h1>Organisation</h1>
+          <p>Districts, schools, and user scope assignments</p>
+          <div class="organisation-hero-meta"><span>Administration</span><i aria-hidden="true"></i><span>Scope Foundation</span></div>
+        </div>
+      </section>
+
+      <nav class="organisation-tabs" role="tablist" aria-label="Organisation sections">
+        <button class="organisation-tab" id="districts-tab" type="button" role="tab" aria-controls="districtsPanel" dmx-bind:aria-selected="organisationTab.value == 'districts'" dmx-class:is-active="organisationTab.value == 'districts'" dmx-on:click="organisationTab.setValue('districts')" dmx-show="authContext.data.can_districts_view"><i class="fas fa-university" aria-hidden="true"></i>Districts</button>
+        <button class="organisation-tab" id="schools-tab" type="button" role="tab" aria-controls="schoolsPanel" dmx-bind:aria-selected="organisationTab.value == 'schools'" dmx-class:is-active="organisationTab.value == 'schools'" dmx-on:click="organisationTab.setValue('schools')" dmx-show="authContext.data.can_schools_view"><i class="fas fa-graduation-cap" aria-hidden="true"></i>Schools</button>
+        <button class="organisation-tab" id="scopes-tab" type="button" role="tab" aria-controls="scopesPanel" dmx-bind:aria-selected="organisationTab.value == 'scopes'" dmx-class:is-active="organisationTab.value == 'scopes'" dmx-on:click="organisationTab.setValue('scopes')" dmx-show="authContext.data.can_user_scopes_view"><i class="fas fa-users" aria-hidden="true"></i>Users &amp; Scope Assignments</button>
+      </nav>
+
+      <div class="organisation-tab-content">
+        <section class="organisation-panel" id="districtsPanel" role="tabpanel" aria-labelledby="districts-tab" dmx-show="organisationTab.value == 'districts'">
+          <article class="portal-card organisation-card">
+            <header class="organisation-section-heading">
+              <span class="organisation-section-icon"><i class="fas fa-university" aria-hidden="true"></i></span>
+              <div><h2>Education Districts</h2><p>Manage education districts and view their school counts, status and last updated information.</p></div>
+              <button class="btn btn-bmobile-primary organisation-add-button" type="button" dmx-show="authContext.data.can_districts_manage" dmx-on:click="districtForm.reset(true);districtModalMode.setValue('add');districtModalId.setValue('');districtModalName.setValue('');districtModalStatus.setValue('active');districtModalSchoolCount.setValue(0);districtDeleteConfirming.setValue(false);districtModal.show()"><i class="fas fa-plus-circle" aria-hidden="true"></i> Add District</button>
+            </header>
+            <div class="organisation-district-filters">
+              <label class="organisation-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search districts</span><input id="districtSearch" type="search" placeholder="Search districts…"></label>
+              <select id="districtStatusFilter" class="form-select" aria-label="Filter districts by status">
+                <option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="table-responsive portal-table-wrapper organisation-table-wrapper">
+              <table class="table portal-table align-middle organisation-table">
+                <thead><tr><th>District Name <i class="fas fa-sort" aria-hidden="true"></i></th><th>Status <i class="fas fa-sort" aria-hidden="true"></i></th><th>School Count <i class="fas fa-sort" aria-hidden="true"></i></th><th>Updated <i class="fas fa-sort" aria-hidden="true"></i></th><th>Actions</th></tr></thead>
+                <tbody is="dmx-repeat" dmx-bind:repeat="districtList.data.districts">
+                  <tr dmx-show="(!districtSearch.value || name.lowercase().contains(districtSearch.value.lowercase())) && (!districtStatusFilter.value || status == districtStatusFilter.value)">
+                    <td dmx-text="name"></td>
+                    <td><span class="organisation-status" dmx-class:is-inactive="status != 'active'"><i aria-hidden="true"></i><span dmx-text="status"></span></span></td>
+                    <td dmx-text="school_count"></td>
+                    <td dmx-text="updated_at"></td>
+                    <td><button class="btn btn-bmobile-secondary btn-sm organisation-edit-button" type="button" dmx-show="authContext.data.can_districts_manage" dmx-on:click="districtForm.reset(true);districtModalMode.setValue('edit');districtModalId.setValue(id);districtModalName.setValue(name);districtModalStatus.setValue(status);districtModalSchoolCount.setValue(school_count);districtDeleteConfirming.setValue(false);districtModal.show()"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="organisation-panel" id="schoolsPanel" role="tabpanel" aria-labelledby="schools-tab" dmx-show="organisationTab.value == 'schools'">
+          <article class="portal-card organisation-card">
+            <header class="organisation-section-heading">
+              <span class="organisation-section-icon"><i class="fas fa-graduation-cap" aria-hidden="true"></i></span>
+              <div><h2>Schools</h2><p>Manage school records, district placement and active status.</p></div>
+              <button class="btn btn-bmobile-primary organisation-add-button" type="button" dmx-show="authContext.data.can_schools_manage" dmx-on:click="schoolModalMode.setValue('add');schoolModalDistrictId.setValue('');schoolDeleteConfirming.setValue(false);schoolDeleteForm.reset(true);schoolModal.show();schoolDetail.reset();portalSetSchoolForm(null)"><i class="fas fa-plus-circle" aria-hidden="true"></i> Add School</button>
+            </header>
+            <div class="organisation-school-filters">
+              <label class="organisation-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search schools</span><input id="schoolSearch" type="search" placeholder="Search schools…"></label>
+              <select id="schoolDistrictFilter" class="form-select" aria-label="Filter schools by district">
+                  <option value="">All districts</option>
+                  <option dmx-repeat="districtList.data.districts" dmx-bind:value="id" dmx-text="name"></option>
+              </select>
+              <select id="schoolStatusFilter" class="form-select" aria-label="Filter schools by status">
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+              </select>
+            </div>
+            <div class="table-responsive portal-table-wrapper organisation-table-wrapper">
+              <table class="table portal-table align-middle organisation-table">
+                <thead><tr><th>School Name</th><th>School Code</th><th>District</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody is="dmx-repeat" dmx-bind:repeat="schoolList.data.schools">
+                  <tr dmx-show="(!schoolSearch.value || name.lowercase().contains(schoolSearch.value.lowercase()) || (school_code && school_code.lowercase().contains(schoolSearch.value.lowercase()))) && (!schoolDistrictFilter.value || district_id == schoolDistrictFilter.value) && (!schoolStatusFilter.value || status == schoolStatusFilter.value)">
+                    <td dmx-text="name"></td>
+                    <td dmx-text="school_code ? school_code : '-'"></td>
+                    <td dmx-text="district_name ? district_name : 'Unassigned'"></td>
+                    <td><span class="organisation-status" dmx-class:is-inactive="status != 'active'"><i aria-hidden="true"></i><span dmx-text="status"></span></span></td>
+                    <td><button class="btn btn-bmobile-secondary btn-sm organisation-edit-button" type="button" dmx-show="authContext.data.can_schools_manage" dmx-on:click="schoolModalMode.setValue('edit');schoolModalDistrictId.setValue('loading');schoolDeleteConfirming.setValue(false);schoolDeleteForm.reset(true);schoolModal.show();schoolDetail.reset();schoolDetail.load({id:id}, true)"><i class="fas fa-pen" aria-hidden="true"></i> Edit</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+
+        <section class="organisation-panel" id="scopesPanel" role="tabpanel" aria-labelledby="scopes-tab" dmx-show="organisationTab.value == 'scopes'">
+          <article class="portal-card organisation-card organisation-scope-card">
+            <header class="organisation-section-heading">
+              <span class="organisation-section-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
+              <div><h2>User Scope Assignments</h2><p>Review each user’s organisational access and manage assigned locations.</p></div>
+            </header>
+            <div class="organisation-scope-layout">
+              <aside class="organisation-user-picker scope-user-picker">
+                <label class="form-label" for="selectedUser">Portal User</label>
+                <select id="selectedUser" class="form-select" autocomplete="off" dmx-on:change="assignNationalForm.reset(true);assignDistrictForm.reset(true);assignSchoolForm.reset(true);selectedScopeUser.setValue(this.value);this.value ? scopeDetail.load({user_id:this.value}, true) : scopeDetail.reset()">
+                  <option value="">Select a user</option>
+                  <option dmx-repeat="userSearch.data.users" dmx-bind:value="id" dmx-text="display_name + ' (' + username + ')'"></option>
+                </select>
+              </aside>
+              <div class="organisation-scope-detail scope-user-detail" dmx-show="!selectedScopeUser.value">
+                <div class="organisation-scope-empty"><span class="organisation-section-icon"><i class="fas fa-user-check" aria-hidden="true"></i></span><h3>Select a portal user</h3><p>Choose a user to review and manage organisational scope.</p></div>
+              </div>
+              <div class="organisation-scope-detail scope-user-detail" dmx-show="selectedScopeUser.value && scopeDetail.data.user.id == selectedScopeUser.value">
+                <div class="organisation-user-heading scope-user-heading">
+                  <div><span class="organisation-scope-eyebrow">Selected portal user</span><h3 dmx-text="scopeDetail.data.user.display_name">Selected User</h3></div>
+                  <div class="scope-role-list" is="dmx-repeat" dmx-bind:repeat="scopeDetail.data.roles"><span class="badge text-bg-secondary" dmx-text="$value"></span></div>
+                </div>
+                <div class="organisation-scope-actions scope-assignment-actions" dmx-show="authContext.data.can_user_scopes_manage">
+                  <form id="assignNationalForm" is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/assign-national" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true);assignNationalForm.reset(true)">
+                    <input type="hidden" name="user_id" dmx-bind:value="selectedScopeUser.value">
+                    <button class="btn btn-bmobile-primary btn-sm" type="submit" dmx-bind:disabled="assignNationalForm.state.executing"><i class="fas fa-globe" aria-hidden="true"></i> Assign National</button>
+                  </form>
+                  <button class="btn btn-bmobile-secondary btn-sm" type="button" dmx-on:click="assignDistrictModal.show();assignDistrictForm.reset(true);assignDistrictUserId.setValue(selectedScopeUser.value);assignDistrict.setValue('')"><i class="fas fa-university" aria-hidden="true"></i> Assign District</button>
+                  <button class="btn btn-bmobile-secondary btn-sm" type="button" dmx-on:click="assignSchoolModal.show();assignSchoolForm.reset(true);assignSchoolUserId.setValue(selectedScopeUser.value);assignSchool.setValue('')"><i class="fas fa-graduation-cap" aria-hidden="true"></i> Assign School</button>
+                  <form id="assignServiceLocationForm" class="scope-service-location-form" is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/assign-service-location" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true);assignServiceLocationForm.reset(true)"><input type="hidden" name="user_id" dmx-bind:value="selectedScopeUser.value"><select class="form-select form-select-sm" name="service_location_id" required aria-label="Repair Centre service location"><option value="">Repair Centre location</option><option dmx-repeat="serviceLocationOptions.data.locations" dmx-bind:value="id" dmx-text="name + ' (' + code + ')' "></option></select><button class="btn btn-bmobile-secondary btn-sm" type="submit" dmx-bind:disabled="assignServiceLocationForm.state.executing"><i class="fas fa-wrench" aria-hidden="true"></i> Assign Repair Centre</button></form>
+                  <div class="alert alert-danger w-100 mb-0" role="alert" dmx-show="assignNationalForm.lastError.status"><span dmx-text="assignNationalForm.lastError.response && assignNationalForm.lastError.response.error ? assignNationalForm.lastError.response.error : 'Unable to complete the scope assignment. Please try again.'"></span></div>
+                </div>
+                <div class="organisation-scope-lists scope-summary-list">
+                  <section class="scope-summary-row">
+                    <span class="scope-summary-icon"><i class="fas fa-globe" aria-hidden="true"></i></span><div class="scope-summary-content"><h4>National Scope</h4><p class="scope-empty-note" dmx-show="scopeDetail.data.national_scopes.where('status', '==', 'active').count() == 0">No national scope assigned.</p>
+                      <div class="scope-summary-entry" is="dmx-repeat" dmx-bind:repeat="scopeDetail.data.national_scopes"><span><span class="badge text-bg-success" dmx-text="status"></span> <span dmx-text="assigned_at"></span></span><form is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/revoke" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true)"><input type="hidden" name="scope_type" value="national"><input type="hidden" name="scope_id" dmx-bind:value="id"><button class="btn btn-bmobile-secondary btn-sm" type="submit" dmx-show="status == 'active'">Revoke</button></form></div>
+                    </div>
+                  </section>
+                  <section class="scope-summary-row">
+                    <span class="scope-summary-icon"><i class="fas fa-university" aria-hidden="true"></i></span><div class="scope-summary-content"><h4>District Scopes</h4><p class="scope-empty-note" dmx-show="scopeDetail.data.district_scopes.where('status', '==', 'active').count() == 0">No district scopes assigned.</p>
+                      <div class="scope-summary-entry" is="dmx-repeat" dmx-bind:repeat="scopeDetail.data.district_scopes"><span dmx-text="district_name + ' - ' + status"></span><form is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/revoke" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true)"><input type="hidden" name="scope_type" value="district"><input type="hidden" name="scope_id" dmx-bind:value="$value.id"><button class="btn btn-bmobile-secondary btn-sm" type="submit" dmx-show="$value.status == 'active'">Revoke</button></form></div>
+                    </div>
+                  </section>
+                  <section class="scope-summary-row">
+                    <span class="scope-summary-icon"><i class="fas fa-graduation-cap" aria-hidden="true"></i></span><div class="scope-summary-content"><h4>School Scopes</h4><p class="scope-empty-note" dmx-show="scopeDetail.data.school_scopes.where('status', '==', 'active').count() == 0">No school scopes assigned.</p>
+                      <div class="scope-summary-entry" is="dmx-repeat" dmx-bind:repeat="scopeDetail.data.school_scopes"><span dmx-text="school_name + (district_name ? ' - ' + district_name : '') + ' - ' + status"></span><form is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/revoke" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true)"><input type="hidden" name="scope_type" value="school"><input type="hidden" name="scope_id" dmx-bind:value="$value.id"><button class="btn btn-bmobile-secondary btn-sm" type="submit" dmx-show="$value.status == 'active'">Revoke</button></form></div>
+                    </div>
+                  </section>
+                  <section class="scope-summary-row">
+                    <span class="scope-summary-icon"><i class="fas fa-map-marker-alt" aria-hidden="true"></i></span><div class="scope-summary-content"><h4>Service Location Scopes</h4><p class="scope-empty-note" dmx-show="scopeDetail.data.service_location_scopes.where('status', '==', 'active').count() == 0">No Repair Centre service-location scopes assigned.</p>
+                      <div class="scope-summary-entry" is="dmx-repeat" dmx-bind:repeat="scopeDetail.data.service_location_scopes"><span dmx-text="name + ' (' + code + ') - ' + status"></span><form is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/revoke-service-location" dmx-on:success="scopeDetail.load({user_id:selectedScopeUser.value}, true)"><input type="hidden" name="scope_id" dmx-bind:value="$value.id"><button class="btn btn-bmobile-secondary btn-sm" type="submit" dmx-show="$value.status == 'active'">Revoke</button></form></div>
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="districtModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="districtModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered organisation-modal-dialog"><div class="modal-content portal-modal organisation-modal"><header class="organisation-modal-header"><span class="organisation-modal-icon"><i class="fas fa-university" aria-hidden="true"></i></span><div><span class="organisation-modal-eyebrow">Organisation setup</span><h2 class="modal-title" id="districtModalTitle" dmx-text="districtModalMode.value == 'edit' ? 'Edit District' : 'Add District'">Add District</h2><p dmx-text="districtModalMode.value == 'edit' ? 'Update the district name or status for this education district.' : 'Create an education district to organise schools and manage assignments.'">Create an education district to organise schools and manage assignments.</p></div><button type="button" class="btn-close" dmx-on:click="districtModal.hide()" aria-label="Close"></button></header>
+    <form id="districtForm" is="dmx-serverconnect-form" method="post" action="/api/admin/districts/save" dmx-on:success="districtModal.hide();districtList.load();districtForm.reset()">
+      <div class="modal-body organisation-modal-body"><input id="districtId" type="hidden" name="id" dmx-bind:value="districtModalId.value"><label class="form-label" for="districtName">District Name <span class="organisation-required">*</span></label><input id="districtName" class="form-control" name="name" placeholder="Enter district name (e.g. Caroni)" dmx-bind:value="districtModalName.value" required><small class="organisation-field-help">This name will be used to identify the district across the system.</small><label class="form-label mt-3" for="districtStatus">Status <span class="organisation-required">*</span></label><select id="districtStatus" class="form-select" name="status" dmx-bind:value="districtModalStatus.value" required><option value="active">Active</option><option value="inactive">Inactive</option></select><small class="organisation-field-help">Set the current status for this district.</small><div class="alert alert-danger mt-3 mb-0" role="alert" dmx-show="districtDeleteForm.lastError.status" dmx-text="districtDeleteForm.lastError.response && districtDeleteForm.lastError.response.error ? districtDeleteForm.lastError.response.error : 'District could not be deleted.'"></div><div class="organisation-delete-confirmation mt-3" role="alert" dmx-show="districtDeleteConfirming.value"><strong>Delete <span dmx-text="districtModalName.value"></span>?</strong><p class="mb-0">This cannot be undone. Districts with associated schools cannot be deleted.</p></div></div>
+    </form>
+    <form id="districtDeleteForm" class="visually-hidden" is="dmx-serverconnect-form" method="post" action="/api/admin/districts/delete" dmx-on:success="districtModal.hide();districtList.load();districtDeleteForm.reset(true);districtModalMode.setValue('add');districtModalSchoolCount.setValue(0);districtDeleteConfirming.setValue(false)"><input type="hidden" name="district_id" dmx-bind:value="districtModalId.value"></form>
+    <footer class="modal-footer organisation-modal-footer"><button type="button" class="btn btn-bmobile-danger-outline" dmx-show="authContext.data.can_districts_manage && districtModalMode.value == 'edit' && districtModalSchoolCount.value == 0 && !districtDeleteConfirming.value" dmx-on:click="districtDeleteConfirming.setValue(true)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete District</button><button type="button" class="btn btn-bmobile-secondary" dmx-show="!districtDeleteConfirming.value" dmx-on:click="districtModal.hide()">Cancel</button><button type="button" class="btn btn-bmobile-secondary" dmx-show="districtDeleteConfirming.value" dmx-on:click="districtDeleteConfirming.setValue(false)">Keep District</button><button type="submit" form="districtDeleteForm" class="btn btn-danger" dmx-show="districtDeleteConfirming.value" dmx-bind:disabled="districtDeleteForm.state.executing"><i class="fas fa-trash-alt" aria-hidden="true"></i> Confirm Delete</button><button type="submit" form="districtForm" class="btn btn-bmobile-primary" dmx-show="!districtDeleteConfirming.value"><i class="fas fa-save" aria-hidden="true"></i><span dmx-text="districtModalMode.value == 'edit' ? 'Update District' : 'Save District'">Save District</span></button></footer></div></div>
+</div>
+
+<div id="schoolModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="schoolModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered organisation-modal-dialog"><div class="modal-content portal-modal organisation-modal"><header class="organisation-modal-header"><span class="organisation-modal-icon"><i class="fas fa-graduation-cap" aria-hidden="true"></i></span><div><span class="organisation-modal-eyebrow">Organisation setup</span><h2 class="modal-title" id="schoolModalTitle" dmx-text="schoolModalMode.value == 'edit' ? 'Edit School' : 'Add School'">Add School</h2><p dmx-text="schoolModalMode.value == 'edit' ? 'Update this school’s name, district placement and status.' : 'Create a school record and optionally place it within an education district.'">Create a school record and optionally place it within an education district.</p></div><button type="button" class="btn-close" dmx-on:click="schoolModal.hide()" aria-label="Close"></button></header>
+    <form id="schoolForm" is="dmx-serverconnect-form" method="post" action="/api/admin/schools/save" dmx-on:success="schoolModal.hide();schoolList.load();districtList.load();schoolForm.reset()">
+      <div class="modal-body organisation-modal-body"><input id="schoolId" type="hidden" name="id"><div class="alert alert-danger mb-3" role="alert" dmx-show="schoolDeleteForm.lastError.status" dmx-text="schoolDeleteForm.lastError.response && schoolDeleteForm.lastError.response.error ? schoolDeleteForm.lastError.response.error : 'School could not be deleted.'"></div><label class="form-label" for="schoolName">School Name <span class="organisation-required">*</span></label><input id="schoolName" class="form-control" name="name" placeholder="Enter school name" required><label class="form-label mt-3" for="schoolDistrict">District <span class="text-muted">(optional)</span></label><select id="schoolDistrict" class="form-select" name="district_id"><option value="">No district (unassigned)</option><option dmx-repeat="districtList.data.districts" dmx-bind:value="id" dmx-text="name"></option></select><small class="organisation-field-help">Choose a district or leave this school unassigned.</small><label class="form-label mt-3" for="schoolStatus">Status <span class="organisation-required">*</span></label><select id="schoolStatus" class="form-select" name="status" required><option value="active">Active</option><option value="inactive">Inactive</option></select><small class="organisation-field-help">Set the current status for this school.</small><div class="organisation-delete-confirmation mt-3" role="alert" dmx-show="schoolDeleteConfirming.value"><strong>Delete <span dmx-text="schoolName.value"></span>?</strong><p class="mb-0">This cannot be undone. A school with retained records cannot be deleted.</p></div></div>
+    </form>
+    <form id="schoolDeleteForm" class="visually-hidden" is="dmx-serverconnect-form" method="post" action="/api/admin/schools/delete" dmx-on:success="schoolModal.hide();schoolList.load();districtList.load();schoolDetail.reset();schoolDeleteForm.reset(true);schoolDeleteConfirming.setValue(false);schoolModalMode.setValue('add')"><input type="hidden" name="school_id" dmx-bind:value="schoolDetail.data.school.id"></form>
+    <footer class="modal-footer organisation-modal-footer school-modal-footer"><button type="button" class="btn btn-bmobile-danger-outline school-delete-button" dmx-show="authContext.data.can_schools_manage && schoolModalMode.value == 'edit' && schoolModalDistrictId.value != 'loading' && !schoolModalDistrictId.value && !schoolDeleteConfirming.value" dmx-on:click="schoolDeleteConfirming.setValue(true)"><i class="fas fa-trash-alt" aria-hidden="true"></i> Delete School</button><button type="button" class="btn btn-bmobile-secondary" dmx-show="!schoolDeleteConfirming.value" dmx-on:click="schoolModal.hide()">Cancel</button><button type="button" class="btn btn-bmobile-secondary" dmx-show="schoolDeleteConfirming.value" dmx-on:click="schoolDeleteConfirming.setValue(false)">Keep School</button><button type="submit" form="schoolDeleteForm" class="btn btn-danger" dmx-show="schoolDeleteConfirming.value" dmx-bind:disabled="schoolDeleteForm.state.executing"><i class="fas fa-trash-alt" aria-hidden="true"></i> Confirm Delete</button><button type="submit" form="schoolForm" class="btn btn-bmobile-primary" dmx-show="!schoolDeleteConfirming.value" dmx-bind:disabled="schoolForm.state.executing"><i class="fas fa-save" aria-hidden="true"></i><span dmx-text="schoolModalMode.value == 'edit' ? 'Update School' : 'Save School'">Save School</span></button></footer></div></div>
+</div>
+
+<div id="assignDistrictModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="assignDistrictTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered organisation-modal-dialog"><div class="modal-content portal-modal organisation-modal"><header class="organisation-modal-header"><span class="organisation-modal-icon"><i class="fas fa-university" aria-hidden="true"></i></span><div><span class="organisation-modal-eyebrow">Access assignment</span><h2 class="modal-title" id="assignDistrictTitle">Assign District Scope</h2><p>Give this user access to the selected district.</p></div><button type="button" class="btn-close" dmx-on:click="assignDistrictModal.hide()" aria-label="Close"></button></header>
+    <form id="assignDistrictForm" is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/assign-district" dmx-on:success="assignDistrictModal.hide();scopeDetail.load({user_id:selectedScopeUser.value}, true);assignDistrictForm.reset(true)">
+      <div class="modal-body organisation-modal-body"><input id="assignDistrictUserId" type="hidden" name="user_id" dmx-bind:value="selectedScopeUser.value"><div class="alert alert-danger mb-3" role="alert" dmx-show="assignDistrictForm.lastError.status"><span dmx-text="assignDistrictForm.lastError.response && assignDistrictForm.lastError.response.error ? assignDistrictForm.lastError.response.error : 'Unable to complete the scope assignment. Please try again.'"></span></div><label class="form-label" for="assignDistrict">District <span class="organisation-required">*</span></label><select id="assignDistrict" class="form-select" name="district_id" required><option value="">Select district</option><option dmx-repeat="districtList.data.districts" dmx-bind:value="id" dmx-text="name"></option></select></div>
+      <footer class="modal-footer organisation-modal-footer"><button type="button" class="btn btn-bmobile-secondary" dmx-on:click="assignDistrictModal.hide()">Cancel</button><button type="submit" class="btn btn-bmobile-primary" dmx-bind:disabled="assignDistrictForm.state.executing"><i class="fas fa-check" aria-hidden="true"></i> Assign District</button></footer>
+    </form></div></div>
+</div>
+
+<div id="assignSchoolModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="assignSchoolTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered organisation-modal-dialog"><div class="modal-content portal-modal organisation-modal"><header class="organisation-modal-header"><span class="organisation-modal-icon"><i class="fas fa-graduation-cap" aria-hidden="true"></i></span><div><span class="organisation-modal-eyebrow">Access assignment</span><h2 class="modal-title" id="assignSchoolTitle">Assign School Scope</h2><p>Give this user access to the selected school.</p></div><button type="button" class="btn-close" dmx-on:click="assignSchoolModal.hide()" aria-label="Close"></button></header>
+    <form id="assignSchoolForm" is="dmx-serverconnect-form" method="post" action="/api/admin/user-scopes/assign-school" dmx-on:success="assignSchoolModal.hide();scopeDetail.load({user_id:selectedScopeUser.value}, true);assignSchoolForm.reset(true)">
+      <div class="modal-body organisation-modal-body"><input id="assignSchoolUserId" type="hidden" name="user_id" dmx-bind:value="selectedScopeUser.value"><div class="alert alert-danger mb-3" role="alert" dmx-show="assignSchoolForm.lastError.status"><span dmx-text="assignSchoolForm.lastError.response && assignSchoolForm.lastError.response.error ? assignSchoolForm.lastError.response.error : 'Unable to complete the scope assignment. Please try again.'"></span></div><label class="form-label" for="assignSchool">School <span class="organisation-required">*</span></label><select id="assignSchool" class="form-select" name="school_id" required><option value="">Select school</option><option dmx-repeat="schoolList.data.schools" dmx-bind:value="id" dmx-text="name + (district_name ? ' - ' + district_name : ' (unassigned)')"></option></select></div>
+      <footer class="modal-footer organisation-modal-footer"><button type="button" class="btn btn-bmobile-secondary" dmx-on:click="assignSchoolModal.hide()">Cancel</button><button type="submit" class="btn btn-bmobile-primary" dmx-bind:disabled="assignSchoolForm.state.executing"><i class="fas fa-check" aria-hidden="true"></i> Assign School</button></footer>
+    </form></div></div>
+</div>

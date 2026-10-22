@@ -1,0 +1,214 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "sla.view"
+          }
+        }
+      },
+      {
+        "name": "all_total",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_sla_policy_current"
+          }
+        }
+      },
+      {
+        "name": "active_total",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_sla_policy_current",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "policies",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_sla_policy_current",
+            "columns": [
+              {
+                "column": "policy_id"
+              },
+              {
+                "column": "policy_code"
+              },
+              {
+                "column": "policy_version_id"
+              },
+              {
+                "column": "version_number"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "description"
+              },
+              {
+                "column": "calendar_id"
+              },
+              {
+                "column": "calendar_code"
+              },
+              {
+                "column": "calendar_name"
+              },
+              {
+                "column": "target_business_days"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "sort_order"
+              },
+              {
+                "column": "start_event_code"
+              },
+              {
+                "column": "completion_event_code"
+              },
+              {
+                "column": "pause_condition_code"
+              },
+              {
+                "column": "version_created_at"
+              }
+            ],
+            "orders": [
+              {
+                "column": "sort_order",
+                "direction": "asc"
+              },
+              {
+                "column": "policy_code",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search != null && $_GET.search != ''}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "policy_code"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "calendar_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status != null && $_GET.status != ''}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "policies": "{{policies}}",
+            "all_total": "{{all_total}}",
+            "active_total": "{{active_total}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "SLA policies could not be loaded."
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      }
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": {
+    "steps": [
+      { "name": "require_permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "devices.view" } }, "output": true },
+      { "name": "manufacturers", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "manufacturers", "columns": [{ "column": "id" }, { "column": "manufacturer_code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "column": "name", "direction": "asc" }] } } },
+      { "name": "models", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "device_models", "alias": "m" }, "columns": [{ "table": "m", "column": "id" }, { "table": "m", "column": "manufacturer_id" }, { "table": "m", "column": "model_code" }, { "table": "m", "column": "model_name" }, { "table": "mf", "column": "name", "alias": "manufacturer_name" }], "joins": [{ "table": "manufacturers", "alias": "mf", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "mf", "column": "id", "operation": "=", "value": { "table": "m", "column": "manufacturer_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "m", "column": "status" }, "operation": "=", "value": "active" }, { "data": { "table": "mf", "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "table": "mf", "column": "name", "direction": "asc" }, { "table": "m", "column": "model_name", "direction": "asc" }] } } },
+      { "name": "conditions", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "device_conditions", "columns": [{ "column": "id" }, { "column": "code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "status" }, "operation": "=", "value": "active" }] }, "orders": [{ "column": "sort_order", "direction": "asc" }] } } },
+      { "name": "lifecycle", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "device_lifecycle_statuses", "columns": [{ "column": "id" }, { "column": "code" }, { "column": "name" }], "orders": [{ "column": "sort_order", "direction": "asc" }] } } },
+      { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "manufacturers": "{{manufacturers}}", "models": "{{models}}", "conditions": "{{conditions}}", "lifecycle": "{{lifecycle}}" } } }
+    ],
+    "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "An unexpected server error occurred." } } }] }
+  }
+}

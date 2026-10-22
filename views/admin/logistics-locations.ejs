@@ -1,0 +1,81 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="logisticsLocationsPage" appConnect="local" -->
+<meta name="ac:route" content="/admin/logistics-locations">
+<div class="portal-shell logistics-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="locationList" url="/api/logistics/locations/list" dmx-param:search="locationSearch.value" dmx-param:page="locationPage.value" dmx-param:page_size="locationPageSizeSelect.value"></dmx-serverconnect>
+  <dmx-serverconnect id="locationCodePreview" url="/api/logistics/locations/code-preview" noload="true"></dmx-serverconnect>
+  <dmx-value id="locationNotice" value=""></dmx-value>
+  <dmx-value id="locationPage" value="1"></dmx-value>
+  <dmx-value id="locationEditId" value=""></dmx-value>
+  <dmx-value id="locationEditType" value="TTPOST"></dmx-value>
+  <dmx-value id="locationEditCode" value=""></dmx-value>
+  <dmx-value id="locationEditName" value=""></dmx-value>
+  <dmx-value id="locationEditActive" value="1"></dmx-value>
+  <%- await include("../partials/portal-sidebar", { currentPage: "logistics-locations" }) %>
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "Logistics Locations" }) %>
+    <main class="portal-main logistics-page" aria-label="Logistics locations">
+      <div class="logistics-breadcrumb" aria-label="Breadcrumb"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a><i class="fas fa-chevron-right" aria-hidden="true"></i><a href="/admin/organisation">Administration</a><i class="fas fa-chevron-right" aria-hidden="true"></i><strong>Logistics Locations</strong></div>
+      <header class="logistics-heading"><div class="logistics-heading-icon"><i class="fas fa-map-marker-alt" aria-hidden="true"></i></div><div><h1>Logistics Locations</h1><p>Manage TTPost and repair-centre locations. Locations are deactivated, never deleted.</p></div></header>
+
+      <section class="logistics-stats" aria-label="Location summary">
+        <article class="logistics-stat-card"><div class="logistics-stat-icon"><i class="fas fa-map-marker-alt" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Total Locations</span><strong dmx-text="locationList.data.all_total || 0"></strong><small>All logistics locations</small></div><span class="logistics-stat-arrow"><i class="fas fa-layer-group" aria-hidden="true"></i></span></article>
+        <article class="logistics-stat-card"><div class="logistics-stat-icon logistics-stat-icon-box"><i class="fas fa-cube" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Active TTPost</span><strong dmx-text="locationList.data.active_tpost || 0"></strong><small>Active TTPost locations</small></div><span class="logistics-stat-arrow"><i class="fas fa-chevron-right" aria-hidden="true"></i></span></article>
+        <article class="logistics-stat-card"><div class="logistics-stat-icon logistics-stat-icon-repair"><i class="fas fa-wrench" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Active Repair Centres</span><strong dmx-text="locationList.data.active_repair_centres || 0"></strong><small>Active repair-centre locations</small></div><span class="logistics-stat-arrow logistics-stat-arrow-blue"><i class="fas fa-chevron-right" aria-hidden="true"></i></span></article>
+      </section>
+
+      <div class="alert logistics-success" role="status" dmx-show="locationNotice.value"><span class="logistics-success-icon"><i class="fas fa-check" aria-hidden="true"></i></span><span dmx-text="locationNotice.value"></span><button type="button" class="btn-close ms-auto" aria-label="Dismiss success message" dmx-on:click="locationNotice.setValue('')"></button></div>
+      <div class="alert alert-danger logistics-error" role="alert" dmx-show="locationForm.lastError.status" dmx-text="locationForm.lastError.response && locationForm.lastError.response.error ? locationForm.lastError.response.error : 'Location could not be saved.'"></div>
+
+      <section class="logistics-card logistics-add-card" aria-labelledby="addLocationTitle">
+        <div class="logistics-card-heading"><span class="logistics-add-icon"><i class="fas fa-plus" aria-hidden="true"></i></span><div><h2 id="addLocationTitle">Add Logistics Location</h2><p>Create a new logistics location for TTPost or a repair centre.</p></div></div>
+        <form id="locationForm" is="dmx-serverconnect-form" method="post" action="/api/logistics/locations/save" dmx-on:success="locationList.load();locationForm.reset(true);locationNotice.setValue('Logistics location saved.')">
+          <div class="logistics-add-grid">
+            <div><label class="form-label" for="locationType">Location type <span>*</span></label><select id="locationType" name="location_type" class="form-select" required><option value="TTPOST">TTPost</option><option value="REPAIR_CENTRE">Repair Centre</option></select></div>
+            <div><label class="form-label" for="locationCode">Code (generated) <span>*</span></label><input id="locationCode" name="code" class="form-control logistics-code-field" maxlength="50" autocomplete="off" readonly required dmx-bind:value="locationCodePreview.data.name == locationName.value ? locationCodePreview.data.code : ''"><small class="form-text">Generated from the location name.</small></div>
+            <div><label class="form-label" for="locationName">Name <span>*</span></label><input id="locationName" name="name" class="form-control" maxlength="150" required dmx-on:input="locationCodePreview.load({name:locationName.value}, true)" dmx-on:change="locationCodePreview.load({name:locationName.value}, true)"></div>
+            <div><label class="form-label" for="locationActive">Status <span>*</span></label><select id="locationActive" name="is_active" class="form-select" required><option value="1">Active</option><option value="0">Inactive</option></select></div>
+          </div>
+          <button class="btn btn-bmobile-primary logistics-save-button" type="submit" dmx-bind:disabled="locationForm.state.executing || locationCodePreview.state.executing || locationCodePreview.data.name != locationName.value || !locationCodePreview.data.code"><i class="fas fa-save" aria-hidden="true"></i>Save Location</button>
+        </form>
+      </section>
+
+      <section class="logistics-card logistics-table-card" aria-labelledby="locationsTitle">
+        <header class="logistics-table-heading"><div class="logistics-card-heading"><span class="logistics-list-icon"><i class="fas fa-list" aria-hidden="true"></i></span><div><h2 id="locationsTitle">Logistics Locations</h2><p>All logistics locations in the system.</p></div></div><label class="logistics-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search locations</span><input id="locationSearch" type="search" placeholder="Search locations..." dmx-on:input="locationPage.setValue(1);locationList.load()"></label></header>
+        <div class="alert alert-danger logistics-error" role="alert" dmx-show="locationList.lastError.status" dmx-text="locationList.lastError.response && locationList.lastError.response.error ? locationList.lastError.response.error : 'Locations could not be loaded.'"></div>
+        <div class="table-responsive"><table class="table align-middle logistics-table"><thead><tr><th>Type</th><th>Code</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="locationList.data.locations"><tr><td><span class="logistics-type-pill" dmx-class:logistics-type-pill-repair="location_type == 'REPAIR_CENTRE'" dmx-text="location_type == 'TTPOST' ? 'TTPost' : 'Repair Centre'"></span></td><td class="logistics-code-cell" dmx-text="code"></td><td class="logistics-name-cell" dmx-text="name"></td><td><span class="logistics-status-pill" dmx-class:logistics-status-inactive="is_active != 1"><i class="fas fa-circle" aria-hidden="true"></i><span dmx-text="is_active == 1 ? 'Active' : 'Inactive'"></span></span></td><td><div class="logistics-row-actions"><button class="btn btn-bmobile-secondary logistics-edit-button" type="button" dmx-on:click="locationEditId.setValue(id);locationEditType.setValue(location_type);locationEditCode.setValue(code);locationEditName.setValue(name);locationEditActive.setValue(is_active);locationEditModal.show()"><i class="fas fa-pen" aria-hidden="true"></i>Edit</button><div class="dropdown"><button class="btn logistics-more-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions"><i class="fas fa-ellipsis-v" aria-hidden="true"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button class="dropdown-item" type="button" dmx-on:click="locationEditId.setValue(id);locationEditType.setValue(location_type);locationEditCode.setValue(code);locationEditName.setValue(name);locationEditActive.setValue(is_active);locationEditModal.show()"><i class="fas fa-pen me-2" aria-hidden="true"></i>Edit location</button></li></ul></div></div></td></tr></tbody></table></div>
+        <p class="logistics-empty" dmx-show="!locationList.state.executing && locationList.data.total == 0" dmx-text="locationSearch.value ? 'No logistics locations match your search.' : 'No logistics locations have been configured.'"></p>
+        <footer class="logistics-pagination"><span class="logistics-showing" dmx-text="'Showing ' + (locationList.data.total == 0 ? 0 : ((locationList.data.page - 1) * locationList.data.page_size + 1)) + '–' + ((locationList.data.page - 1) * locationList.data.page_size + locationList.data.locations.length) + ' of ' + (locationList.data.total || 0) + ' locations'"></span><div class="logistics-page-controls"><label for="locationPageSizeSelect">Items per page</label><select id="locationPageSizeSelect" class="form-select" dmx-on:change="locationPage.setValue(1);locationList.load()"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select><button class="btn logistics-page-button" type="button" aria-label="Previous page" dmx-bind:disabled="locationList.data.page <= 1" dmx-on:click="locationPage.setValue(locationPage.value - 1);locationList.load()"><i class="fas fa-chevron-left" aria-hidden="true"></i></button><span class="logistics-current-page" dmx-text="locationList.data.page || 1"></span><button class="btn logistics-page-button" type="button" aria-label="Next page" dmx-bind:disabled="locationList.data.page >= locationList.data.total_pages" dmx-on:click="locationPage.setValue(locationPage.value + 1);locationList.load()"><i class="fas fa-chevron-right" aria-hidden="true"></i></button></div></footer>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div id="locationEditModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="locationEditTitle" aria-hidden="true" dmx-on:hidden="editLocationForm.reset(true);locationEditId.setValue('');locationEditType.setValue('TTPOST');locationEditCode.setValue('');locationEditName.setValue('');locationEditActive.setValue('1')">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content portal-modal">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="locationEditTitle">Edit Logistics Location</h2>
+        <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editLocationForm" is="dmx-serverconnect-form" method="post" action="/api/logistics/locations/save" dmx-on:success="locationEditModal.hide();locationList.load();locationNotice.setValue('Logistics location updated.')">
+        <div class="modal-body">
+          <input type="hidden" name="id" dmx-bind:value="locationEditId.value">
+          <div class="alert alert-danger" role="alert" dmx-show="editLocationForm.lastError.status" dmx-text="editLocationForm.lastError.response && editLocationForm.lastError.response.error ? editLocationForm.lastError.response.error : 'Location could not be saved.'"></div>
+          <label class="form-label" for="editLocationType">Location type</label>
+          <select id="editLocationType" name="location_type" class="form-select mb-3" required dmx-bind:value="locationEditType.value"><option value="TTPOST">TTPost</option><option value="REPAIR_CENTRE">Repair Centre</option></select>
+          <label class="form-label" for="editLocationCode">Code</label>
+          <input id="editLocationCode" name="code" class="form-control logistics-code-field mb-3" maxlength="50" autocomplete="off" readonly required dmx-bind:value="locationEditCode.value">
+          <label class="form-label" for="editLocationName">Name</label>
+          <input id="editLocationName" name="name" class="form-control mb-3" maxlength="150" required dmx-bind:value="locationEditName.value">
+          <label class="form-label" for="editLocationActive">Status</label>
+          <select id="editLocationActive" name="is_active" class="form-select" required dmx-bind:value="locationEditActive.value"><option value="1">Active</option><option value="0">Inactive</option></select>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-bmobile-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="editLocationForm.state.executing">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

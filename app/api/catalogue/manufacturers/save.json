@@ -1,0 +1,535 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "id",
+        "type": "number"
+      },
+      {
+        "name": "name",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "generated_timestamp",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_timestamp",
+          "value": "{{toTimestamp(NOW)}}"
+        }
+      },
+      {
+        "name": "generated_code",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_code",
+          "value": "{{'P4BMFG' + generated_timestamp}}"
+        }
+      },
+      {
+        "name": "code_match",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturers",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "manufacturer_code"
+                  },
+                  "operation": "=",
+                  "value": "{{generated_code}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "while",
+        "options": {
+          "while": "{{code_match.id}}",
+          "max": 100000,
+          "exec": {
+            "steps": [
+              {
+                "name": "generated_timestamp",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "generated_timestamp",
+                  "value": "{{generated_timestamp + 1}}"
+                }
+              },
+              {
+                "name": "generated_code",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "generated_code",
+                  "value": "{{'P4BMFG' + generated_timestamp}}"
+                }
+              },
+              {
+                "name": "code_match",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturers",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "manufacturer_code"
+                          },
+                          "operation": "=",
+                          "value": "{{generated_code}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "manufacturer_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "manufacturer_name",
+          "value": "{{($_POST.name || '').trim()}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!manufacturer_name || manufacturer_name.length() > 180}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Manufacturer name is required within its length limit."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "existing",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "manufacturers",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!existing.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 404,
+                          "data": {
+                            "success": false,
+                            "error": "Manufacturer was not found."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "duplicate",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturers",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "manufacturer_code"
+                      },
+                      "operation": "=",
+                      "value": "{{generated_code}}"
+                    },
+                    {
+                      "data": {
+                        "column": "name"
+                      },
+                      "operation": "=",
+                      "value": "{{manufacturer_name}}"
+                    }
+                  ]
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_POST.id ? $_POST.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{duplicate.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Manufacturer code or name already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "save_manufacturer",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "update_manufacturer",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "manufacturers",
+                            "values": [
+                              {
+                                "column": "name",
+                                "value": "{{manufacturer_name}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{$_POST.id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_manufacturer_updated",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "manufacturer_updated"
+                              },
+                              {
+                                "column": "module",
+                                "value": "device_catalogue"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "manufacturer"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{$_POST.id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Manufacturer updated."
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "save_manufacturer",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "create_manufacturer",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "manufacturers",
+                            "values": [
+                              {
+                                "column": "manufacturer_code",
+                                "value": "{{generated_code}}"
+                              },
+                              {
+                                "column": "name",
+                                "value": "{{manufacturer_name}}"
+                              },
+                              {
+                                "column": "status",
+                                "value": "active"
+                              },
+                              {
+                                "column": "created_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_manufacturer_created",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "manufacturer_created"
+                              },
+                              {
+                                "column": "module",
+                                "value": "device_catalogue"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "manufacturer"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{create_manufacturer.identity}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Manufacturer created."
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

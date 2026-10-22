@@ -1,0 +1,8 @@
+{
+  "exec": {
+    "steps": [
+      { "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{$_PARAM.actor_user_id || null}}" }, { "column": "action", "value": "notification_delivery_failed" }, { "column": "module", "value": "notifications" }, { "column": "entity_type", "value": "{{$_PARAM.source_type || 'workflow_event'}}" }, { "column": "entity_id", "value": "{{$_PARAM.source_id || null}}" }, { "column": "description", "value": "Derived in-app notification failed after the operational workflow committed. Event {{$_PARAM.source_type || 'WORKFLOW'}}; stage {{$_PARAM.failure_stage || 'unknown'}}." }] } } }
+    ],
+    "catch": [{ "module": "core", "action": "setvalue", "output": true, "options": { "key": "notification_failure_audit_unavailable", "value": true } }]
+  }
+}

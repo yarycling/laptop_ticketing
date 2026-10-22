@@ -1,0 +1,87 @@
+{
+  "exec": {
+    "steps": [
+      { "module": "core", "action": "condition", "options": { "if": "{{!['SLA_AT_RISK','SLA_BREACHED','ESCALATION_RESOLVED','ESCALATION_CANCELLED'].contains($_PARAM.event_type_code) || !$_PARAM.escalation_case_id}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "ESCALATION_NOTIFICATION_INPUT_INVALID" } }] } } },
+      { "name": "context", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "v_escalation_operational_queue", "columns": [{ "column": "escalation_case_id" }, { "column": "escalation_number" }, { "column": "sla_instance_id" }, { "column": "policy_code_snapshot" }, { "column": "ticket_id" }, { "column": "ticket_number" }, { "column": "logistics_case_id" }, { "column": "repair_job_id" }, { "column": "current_state_code" }, { "column": "current_level" }, { "column": "sla_state_code" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "escalation_case_id" }, "operation": "=", "value": "{{$_PARAM.escalation_case_id}}" }] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{!context.escalation_case_id || (['SLA_AT_RISK','SLA_BREACHED'].contains($_PARAM.event_type_code) && context.current_state_code != 'OPEN' && context.current_state_code != 'ACKNOWLEDGED') || ($_PARAM.event_type_code == 'SLA_AT_RISK' && context.sla_state_code != 'AT_RISK') || ($_PARAM.event_type_code == 'SLA_BREACHED' && context.sla_state_code != 'BREACHED') || ($_PARAM.event_type_code == 'ESCALATION_RESOLVED' && context.current_state_code != 'RESOLVED') || ($_PARAM.event_type_code == 'ESCALATION_CANCELLED' && context.current_state_code != 'CANCELLED')}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "ESCALATION_NOTIFICATION_STATE_INVALID" } }] } } },
+      { "name": "recipients", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "escalation_assignments", "alias": "a" }, "columns": [{ "table": "u", "column": "id", "alias": "recipient_user_id" }, { "table": "r", "column": "name", "alias": "recipient_role_code" }], "joins": [
+        { "table": "roles", "alias": "r", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "r", "column": "id", "operation": "=", "value": { "table": "a", "column": "target_role_id" } }] } },
+        { "table": "user_roles", "alias": "ur", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "ur", "column": "role_id", "operation": "=", "value": { "table": "a", "column": "target_role_id" } }] } },
+        { "table": "users", "alias": "u", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "ur", "column": "user_id" } }] } },
+        { "table": "escalation_cases", "alias": "ec", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "ec", "column": "id", "operation": "=", "value": { "table": "a", "column": "escalation_case_id" } }] } },
+        { "table": "user_national_scopes", "alias": "ns", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "ns", "column": "user_id", "operation": "=", "value": { "table": "u", "column": "id" } }] } },
+        { "table": "user_district_scopes", "alias": "ds", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "ds", "column": "user_id", "operation": "=", "value": { "table": "u", "column": "id" } }, { "table": "ds", "column": "district_id", "operation": "=", "value": { "table": "ec", "column": "district_id" } }] } },
+        { "table": "user_school_scopes", "alias": "ss", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "ss", "column": "user_id", "operation": "=", "value": { "table": "u", "column": "id" } }, { "table": "ss", "column": "school_id", "operation": "=", "value": { "table": "ec", "column": "school_id" } }] } },
+        { "table": "user_service_location_scopes", "alias": "ls", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "ls", "column": "user_id", "operation": "=", "value": { "table": "u", "column": "id" } }, { "table": "ls", "column": "service_location_id", "operation": "=", "value": { "table": "ec", "column": "repair_centre_location_id" } }] } }
+      ], "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "a", "column": "escalation_case_id" }, "operation": "=", "value": "{{context.escalation_case_id}}" },
+        { "data": { "table": "u", "column": "status" }, "operation": "=", "value": "active" },
+        { "data": { "table": "a", "column": "level_snapshot" }, "conditional": "{{['SLA_AT_RISK','SLA_BREACHED'].contains($_PARAM.event_type_code)}}", "operation": "=", "value": "{{$_PARAM.event_type_code == 'SLA_AT_RISK' ? 1 : 2}}" },
+        { "condition": "OR", "conditional": "{{['ESCALATION_RESOLVED','ESCALATION_CANCELLED'].contains($_PARAM.event_type_code)}}", "rules": [
+          { "data": { "table": "a", "column": "level_snapshot" }, "operation": "=", "value": 1 },
+          { "data": { "table": "a", "column": "level_snapshot" }, "operation": "=", "value": 2 }
+        ] },
+        { "condition": "OR", "rules": [
+          { "data": { "table": "r", "column": "name" }, "operation": "=", "value": "TTPOST_LOGISTICS" },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "=", "value": "MOE_HEAD_OFFICE" },
+            { "data": { "table": "ns", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ns", "column": "status" }, "operation": "=", "value": "active" }
+          ] },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "=", "value": "REPAIR_CENTRE" },
+            { "data": { "table": "ls", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ls", "column": "status" }, "operation": "=", "value": "active" }
+          ] },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "!=", "value": "MOE_HEAD_OFFICE" },
+            { "data": { "table": "ns", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ns", "column": "status" }, "operation": "=", "value": "active" }
+          ] },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "!=", "value": "MOE_HEAD_OFFICE" },
+            { "data": { "table": "ds", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ds", "column": "status" }, "operation": "=", "value": "active" }
+          ] },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "!=", "value": "MOE_HEAD_OFFICE" },
+            { "data": { "table": "ss", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ss", "column": "status" }, "operation": "=", "value": "active" }
+          ] },
+          { "condition": "AND", "rules": [
+            { "data": { "table": "r", "column": "name" }, "operation": "!=", "value": "MOE_HEAD_OFFICE" },
+            { "data": { "table": "ls", "column": "id" }, "operator": "is_not_null" },
+            { "data": { "table": "ls", "column": "status" }, "operation": "=", "value": "active" }
+          ] }
+        ] }
+      ] } } } },
+      { "name": "terminal_recipients", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "notification_events", "alias": "ne" }, "columns": [{ "table": "nr", "column": "user_id", "alias": "recipient_user_id" }, { "table": "nr", "column": "recipient_role_code" }], "joins": [
+        { "table": "notification_recipients", "alias": "nr", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "nr", "column": "notification_event_id", "operation": "=", "value": { "table": "ne", "column": "id" } }] } },
+        { "table": "users", "alias": "u", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "nr", "column": "user_id" } }] } }
+      ], "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "ne", "column": "escalation_case_id" }, "operation": "=", "value": "{{context.escalation_case_id}}" },
+        { "data": { "table": "u", "column": "status" }, "operation": "=", "value": "active" },
+        { "data": { "table": "ne", "column": "event_type_code" }, "operation": "in", "value": ["SLA_AT_RISK", "SLA_BREACHED"] }
+      ] } } } },
+      { "name": "selected_recipients", "module": "core", "action": "setvalue", "output": true, "options": { "key": "selected_recipients", "value": "{{['ESCALATION_RESOLVED','ESCALATION_CANCELLED'].contains($_PARAM.event_type_code) ? terminal_recipients : recipients}}" } },
+      { "name": "severity_code", "module": "core", "action": "setvalue", "output": true, "options": { "key": "severity_code", "value": "{{$_PARAM.event_type_code == 'SLA_AT_RISK' ? 'WARNING' : ($_PARAM.event_type_code == 'SLA_BREACHED' ? 'CRITICAL' : ($_PARAM.event_type_code == 'ESCALATION_RESOLVED' ? 'SUCCESS' : 'INFO'))}}" } },
+      { "name": "notification_title", "module": "core", "action": "setvalue", "output": true, "options": { "key": "notification_title", "value": "{{$_PARAM.event_type_code == 'SLA_AT_RISK' ? context.policy_code_snapshot + ' SLA at risk — ' + context.ticket_number : ($_PARAM.event_type_code == 'SLA_BREACHED' ? context.policy_code_snapshot + ' SLA breached — ' + context.ticket_number : ($_PARAM.event_type_code == 'ESCALATION_RESOLVED' ? 'Escalation resolved — ' + context.ticket_number : 'Escalation cancelled — ' + context.ticket_number))}}" } },
+      { "name": "notification_message", "module": "core", "action": "setvalue", "output": true, "options": { "key": "notification_message", "value": "{{$_PARAM.event_type_code == 'SLA_AT_RISK' ? 'The ' + context.policy_code_snapshot + ' SLA for ' + context.ticket_number + ' is at risk and requires attention.' : ($_PARAM.event_type_code == 'SLA_BREACHED' ? 'The ' + context.policy_code_snapshot + ' SLA for ' + context.ticket_number + ' has breached and has been escalated.' : ($_PARAM.event_type_code == 'ESCALATION_RESOLVED' ? 'The escalation for the ' + context.policy_code_snapshot + ' SLA on ' + context.ticket_number + ' has been resolved.' : 'The escalation for the ' + context.policy_code_snapshot + ' SLA on ' + context.ticket_number + ' has been cancelled.'))}}" } },
+      { "name": "create_each", "module": "core", "action": "repeat", "options": { "repeat": "{{selected_recipients}}", "exec": { "steps": [
+        { "name": "create_notification", "module": "core", "action": "exec", "output": true, "options": { "exec": "notification_create", "params": {
+          "idempotency_key": "{{['SLA_AT_RISK','SLA_BREACHED'].contains($_PARAM.event_type_code) ? 'SLA:' + context.sla_instance_id + ':' + ($_PARAM.event_type_code == 'SLA_AT_RISK' ? 'AT_RISK' : 'BREACHED') : 'ESCALATION:' + context.escalation_case_id + ':' + ($_PARAM.event_type_code == 'ESCALATION_RESOLVED' ? 'RESOLVED' : 'CANCELLED')}}",
+          "event_type_code": "{{$_PARAM.event_type_code}}", "source_type": "ESCALATION", "source_id": "{{context.escalation_number}}",
+          "ticket_id": "{{context.ticket_id}}", "sla_instance_id": "{{context.sla_instance_id}}", "escalation_case_id": "{{context.escalation_case_id}}",
+          "logistics_case_id": "{{context.logistics_case_id}}", "repair_job_id": "{{context.repair_job_id}}", "severity_code": "{{severity_code}}",
+          "title": "{{notification_title}}", "message": "{{notification_message}}", "action_type": "TICKET_DETAIL", "action_reference": "{{context.ticket_id}}",
+          "recipient_user_id": "{{recipient_user_id}}", "recipient_role_code": "{{recipient_role_code}}", "created_by": "{{$_PARAM.actor_user_id || null}}"
+        } } }
+      ] } } },
+      { "name": "notification_count", "module": "core", "action": "setvalue", "output": true, "options": { "key": "notification_count", "value": "{{selected_recipients.length}}" } }
+    ],
+    "catch": [
+      { "name": "failure_audit", "module": "core", "action": "exec", "options": { "exec": "notification_failure_audit", "params": { "escalation_case_id": "{{$_PARAM.escalation_case_id}}", "actor_user_id": "{{$_PARAM.actor_user_id || null}}" } } },
+      { "module": "core", "action": "setvalue", "output": true, "options": { "key": "notification_failed", "value": true } }
+    ]
+  }
+}

@@ -1,0 +1,517 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "id",
+        "type": "number"
+      },
+      {
+        "name": "location_type",
+        "type": "text"
+      },
+      {
+        "name": "code",
+        "type": "text"
+      },
+      {
+        "name": "name",
+        "type": "text"
+      },
+      {
+        "name": "is_active",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "logistics.locations_manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.name || !$_POST.name.trim() || ($_POST.id && (!$_POST.code || !$_POST.code.trim()))}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Enter a location name and, when editing, a location code."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.location_type != 'TTPOST' && $_POST.location_type != 'REPAIR_CENTRE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose TTPOST or Repair Centre as the location type."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.is_active != 0 && $_POST.is_active != 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose whether this location is active."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "existing_location",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id && !existing_location.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Logistics location was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "location_code_base",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "location_code_base",
+          "value": "{{$_POST.name.trim().slugify().uppercase() || 'LOCATION'}}"
+        }
+      },
+      {
+        "name": "matching_location_code_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "{{location_code_base}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_POST.id ? $_POST.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "location_code_suffix_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operator": "begins_with",
+                  "value": "{{location_code_base + '-'}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_POST.id ? $_POST.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "location_code",
+        "module": "core",
+        "action": "setvalue",
+        "output": true,
+        "options": {
+          "key": "location_code",
+          "value": "{{$_POST.id ? $_POST.code.trim() : (matching_location_code_count > 0 ? location_code_base + '-' + (location_code_suffix_count + 1 < 10 ? '0' : '') + (location_code_suffix_count + 1) : location_code_base)}}"
+        }
+      },
+      {
+        "name": "duplicate_code",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "{{location_code}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{duplicate_code.id && duplicate_code.id != $_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "That location code is already in use."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "update_transaction",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "update_location",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "service_locations",
+                            "values": [
+                              {
+                                "column": "location_type",
+                                "value": "{{$_POST.location_type}}"
+                              },
+                              {
+                                "column": "code",
+                                "value": "{{location_code}}"
+                              },
+                              {
+                                "column": "name",
+                                "value": "{{$_POST.name.trim()}}"
+                              },
+                              {
+                                "column": "is_active",
+                                "value": "{{$_POST.is_active}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{$_POST.id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_update",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "logistics_location_updated"
+                              },
+                              {
+                                "column": "module",
+                                "value": "logistics"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "service_location"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{$_POST.id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "{{'Updated logistics location ' + location_code + ' (' + $_POST.location_type + ')'}}"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "create_transaction",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "create_location",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "service_locations",
+                            "values": [
+                              {
+                                "column": "location_type",
+                                "value": "{{$_POST.location_type}}"
+                              },
+                              {
+                                "column": "code",
+                                "value": "{{location_code}}"
+                              },
+                              {
+                                "column": "name",
+                                "value": "{{$_POST.name.trim()}}"
+                              },
+                              {
+                                "column": "is_active",
+                                "value": "{{$_POST.is_active}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_create",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "logistics_location_created"
+                              },
+                              {
+                                "column": "module",
+                                "value": "logistics"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "service_location"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{create_location.identity}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "{{'Created logistics location ' + location_code + ' (' + $_POST.location_type + ')'}}"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "code": "{{location_code}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 409,
+          "data": {
+            "success": false,
+            "error": "The logistics location could not be saved. Check its code and try again."
+          }
+        }
+      }
+    ]
+  }
+}

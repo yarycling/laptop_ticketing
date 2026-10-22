@@ -1,0 +1,56 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "manufacturer_returns.view" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "scope_context", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_get_scope_context", "params": {} } },
+    { "name": "ttpost_role", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "user_roles", "alias": "ur" }, "columns": [{ "table": "r", "column": "id" }], "joins": [{ "table": "roles", "alias": "r", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "r", "column": "id", "operation": "=", "value": { "table": "ur", "column": "role_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "ur", "column": "user_id" }, "operation": "=", "value": "{{identity}}" }, { "data": { "table": "r", "column": "name" }, "operation": "=", "value": "TTPOST_LOGISTICS" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.service_locations.length == 0 && !ttpost_role.id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "name": "manufacturers", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_manufacturer_return_queue", "alias": "q" },
+      "distinct": true,
+      "columns": [{ "table": "q", "column": "manufacturer_id", "alias": "id" }, { "table": "q", "column": "manufacturer_name", "alias": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "q", "column": "manufacturer_id" }, "operation": ">", "value": 0 },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "q", "column": "manufacturer_return_case_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "q", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && scope_context.service_locations.length > 0}}", "rules": [{ "data": { "table": "q", "column": "repair_centre_location_id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{ttpost_role.id}}", "rules": [{ "data": { "table": "q", "column": "has_ttpost_participation" }, "operation": "=", "value": 1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "q", "column": "manufacturer_name", "direction": "asc" }]
+    } } },
+    { "name": "districts", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_manufacturer_return_queue", "alias": "q" },
+      "distinct": true,
+      "columns": [{ "table": "q", "column": "origin_district_id", "alias": "id" }, { "table": "q", "column": "origin_district_name", "alias": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "q", "column": "origin_district_id" }, "operation": ">", "value": 0 },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "q", "column": "manufacturer_return_case_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "q", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && scope_context.service_locations.length > 0}}", "rules": [{ "data": { "table": "q", "column": "repair_centre_location_id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{ttpost_role.id}}", "rules": [{ "data": { "table": "q", "column": "has_ttpost_participation" }, "operation": "=", "value": 1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "q", "column": "origin_district_name", "direction": "asc" }]
+    } } },
+    { "name": "repair_centres", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_manufacturer_return_queue", "alias": "q" },
+      "distinct": true,
+      "columns": [{ "table": "q", "column": "repair_centre_location_id", "alias": "id" }, { "table": "q", "column": "repair_centre_name", "alias": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "q", "column": "repair_centre_location_id" }, "operation": ">", "value": 0 },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "q", "column": "manufacturer_return_case_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "q", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !ttpost_role.id && scope_context.service_locations.length > 0}}", "rules": [{ "data": { "table": "q", "column": "repair_centre_location_id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{ttpost_role.id}}", "rules": [{ "data": { "table": "q", "column": "has_ttpost_participation" }, "operation": "=", "value": 1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "q", "column": "repair_centre_name", "direction": "asc" }]
+    } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "manufacturers": "{{manufacturers}}", "districts": "{{districts}}", "repair_centres": "{{repair_centres}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Manufacturer return filter options could not be loaded." } } }] }
+}

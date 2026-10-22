@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "$_GET": [
+      {
+        "name": "status",
+        "type": "text"
+      },
+      {
+        "name": "search",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.service_locations.length == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "cases",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_temporary_loan_queue",
+              "alias": "q"
+            },
+            "columns": [
+              {
+                "table": "q",
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "table": "q",
+                "column": "loan_number"
+              },
+              {
+                "table": "q",
+                "column": "ticket_id"
+              },
+              {
+                "table": "q",
+                "column": "ticket_number"
+              },
+              {
+                "table": "q",
+                "column": "original_device_id"
+              },
+              {
+                "table": "q",
+                "column": "original_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "original_asset_tag"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_id"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_name"
+              },
+              {
+                "table": "q",
+                "column": "origin_school_id"
+              },
+              {
+                "table": "q",
+                "column": "origin_school_name"
+              },
+              {
+                "table": "q",
+                "column": "repair_service_location_id"
+              },
+              {
+                "table": "q",
+                "column": "repair_centre_name"
+              },
+              {
+                "table": "q",
+                "column": "spare_pool_id"
+              },
+              {
+                "table": "q",
+                "column": "pool_code"
+              },
+              {
+                "table": "q",
+                "column": "spare_pool_name"
+              },
+              { "table": "q", "column": "selected_spare_serial_number" },
+              { "table": "q", "column": "selected_spare_asset_tag" },
+              { "table": "q", "column": "selected_spare_lifecycle_code" },
+              { "table": "q", "column": "selected_spare_stock_status" },
+              { "table": "q", "column": "spare_reservation_status" },
+              { "table": "q", "column": "spare_reservation_active" },
+              { "table": "q", "column": "issued_at" },
+              { "table": "q", "column": "return_requested_at" },
+              { "table": "q", "column": "return_reason_name" },
+              { "table": "q", "column": "return_condition_code" },
+              { "table": "q", "column": "returned_at" },
+              { "table": "q", "column": "conversion_status" },
+              { "table": "q", "column": "conversion_request_number" },
+              { "table": "q", "column": "conversion_request_status" },
+              { "table": "q", "column": "conversion_reason_name" },
+              { "table": "q", "column": "conversion_requested_at" },
+              { "table": "q", "column": "conversion_decision" },
+              { "table": "q", "column": "conversion_decided_at" },
+              { "table": "q", "column": "permanent_replacement_case_id" },
+              { "table": "q", "column": "permanent_replacement_number" },
+              { "table": "q", "column": "permanent_replacement_status" },
+              { "table": "q", "column": "selected_spare_stock_location_id" },
+              { "table": "q", "column": "physical_custody_code" },
+              {
+                "table": "q",
+                "column": "current_status_code"
+              },
+              {
+                "table": "q",
+                "column": "loan_status_name"
+              },
+              {
+                "table": "q",
+                "column": "requested_at"
+              },
+              {
+                "table": "q",
+                "column": "updated_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "temporary_loan_case_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "origin_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "repair_service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status && $_GET.status != 'ALL'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "current_status_code"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "loan_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "ticket_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "original_serial_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "original_asset_tag"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "q",
+                "column": "updated_at",
+                "direction": "desc"
+              },
+              {
+                "table": "q",
+                "column": "temporary_loan_case_id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_cases",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{cases}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "requested_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "requested_at_display",
+                  "value": "{{requested_at ? requested_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              },
+              {
+                "name": "updated_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "updated_at_display",
+                  "value": "{{updated_at ? updated_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              },
+        {
+          "name": "issued_at_display",
+          "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "issued_at_display",
+            "value": "{{issued_at ? issued_at.formatDate('MMM d, yyyy, h:mm A') : 'Not issued'}}"
+          }
+        },
+        {
+          "name": "return_requested_at_display",
+          "module": "core",
+          "action": "setvalue",
+          "output": true,
+          "options": {
+            "key": "return_requested_at_display",
+            "value": "{{return_requested_at ? return_requested_at.formatDate('MMM d, yyyy, h:mm A') : 'Not requested'}}"
+          }
+        },
+              {
+                "name": "returned_at_display",
+          "module": "core",
+          "action": "setvalue",
+          "output": true,
+          "options": {
+            "key": "returned_at_display",
+            "value": "{{returned_at ? returned_at.formatDate('MMM d, yyyy, h:mm A') : 'Not returned'}}"
+          }
+        }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "cases": "{{display_cases}}"
+                  }
+                }
+              },
+              {
+                "name": "conversion_requested_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "conversion_requested_at_display",
+                  "value": "{{conversion_requested_at ? conversion_requested_at.formatDate('MMM d, yyyy, h:mm A') : 'Not requested'}}"
+                }
+              },
+              {
+                "name": "conversion_decided_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "conversion_decided_at_display",
+                  "value": "{{conversion_decided_at ? conversion_decided_at.formatDate('MMM d, yyyy, h:mm A') : 'Not decided'}}"
+                }
+              }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Temporary loans could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

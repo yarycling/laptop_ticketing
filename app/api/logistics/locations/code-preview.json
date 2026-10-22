@@ -1,0 +1,156 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "text",
+        "name": "name"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "logistics.locations_manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "location_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "location_name",
+          "value": "{{$_GET.name ? $_GET.name.trim() : ''}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!location_name}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "code": ""
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "location_code_base",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "location_code_base",
+          "value": "{{location_name.slugify().uppercase() || 'LOCATION'}}"
+        }
+      },
+      {
+        "name": "matching_location_code_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "{{location_code_base}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "location_code_suffix_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "code"
+                  },
+                  "operator": "begins_with",
+                  "value": "{{location_code_base + '-'}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "generated_location_code",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_location_code",
+          "value": "{{matching_location_code_count > 0 ? location_code_base + '-' + (location_code_suffix_count + 1 < 10 ? '0' : '') + (location_code_suffix_count + 1) : location_code_base}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "code": "{{generated_location_code}}",
+            "name": "{{location_name}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "Location code could not be generated."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

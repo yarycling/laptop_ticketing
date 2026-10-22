@@ -1,0 +1,11 @@
+{
+  "meta": {},
+  "exec": {
+    "steps": [
+      { "name": "permission", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "temporary_loans.view" } } },
+      { "name": "reasons", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "temporary_loan_conversion_reasons", "columns": [{ "column": "code" }, { "column": "name" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "is_active" }, "operation": "=", "value": 1 }] }, "orders": [{ "column": "sort_order", "direction": "asc" }] } } },
+      { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "reasons": "{{reasons}}" } } }
+    ],
+    "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Conversion reasons could not be loaded." } } }]
+  }
+}

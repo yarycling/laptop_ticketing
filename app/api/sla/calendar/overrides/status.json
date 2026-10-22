@@ -1,0 +1,63 @@
+{
+  "settings": { "options": { "method": "post" } },
+  "meta": { "$_POST": [
+    { "name": "override_id", "type": "number" },
+    { "name": "status", "type": "text" }
+  ] },
+  "exec": { "steps": [
+    { "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "sla.manage" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_POST.override_id || !['active','inactive'].contains($_POST.status)}}", "then": { "steps": [
+      { "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "Select a valid calendar override status." } } }
+    ] } } },
+    { "name": "calendar", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "sla_calendars", "columns": [ { "column": "id" } ], "wheres": { "condition": "AND", "rules": [
+      { "data": { "column": "calendar_code" }, "operation": "=", "value": "TTO_PORTAL_OPERATIONS" },
+      { "data": { "column": "status" }, "operation": "=", "value": "active" }
+    ] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!calendar.id}}", "then": { "steps": [
+      { "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The default business calendar is unavailable." } } }
+    ] } } },
+    { "name": "current_override", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "sla_calendar_overrides", "columns": [
+      { "column": "id" }, { "column": "calendar_id" }, { "column": "override_date" }, { "column": "override_type" },
+      { "column": "is_business_day" }, { "column": "description" }, { "column": "status" }
+    ], "wheres": { "condition": "AND", "rules": [
+      { "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.override_id}}" },
+      { "data": { "column": "calendar_id" }, "operation": "=", "value": "{{calendar.id}}" }
+    ] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!current_override.id}}", "then": { "steps": [
+      { "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Calendar override was not found." } } }
+    ] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{current_override.status == $_POST.status}}", "then": { "steps": [
+      { "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The calendar override already has that status. Reload the list and try again." } } }
+    ] } } },
+    { "name": "status_action", "module": "core", "action": "setvalue", "output": true, "options": { "key": "status_action", "value": "{{$_POST.status == 'inactive' ? 'DEACTIVATED' : 'CHANGED'}}" } },
+    { "name": "status_transaction", "module": "dbupdater", "action": "transaction", "options": { "connection": "db", "exec": { "steps": [
+      { "name": "update_override", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "sla_calendar_overrides", "values": [
+        { "column": "status", "value": "{{$_POST.status}}" }, { "column": "updated_by", "value": "{{identity}}" }, { "column": "updated_at", "value": "{{NOW}}" }
+      ], "wheres": { "condition": "AND", "rules": [
+        { "data": { "column": "id" }, "operation": "=", "value": "{{current_override.id}}" },
+        { "data": { "column": "status" }, "operation": "=", "value": "{{current_override.status}}" }
+      ] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{update_override.affected != 1}}", "then": { "steps": [
+        { "module": "core", "action": "error", "options": { "message": "SLA_OVERRIDE_STATUS_CONFLICT" } }
+      ] } } },
+      { "name": "history_status_changed", "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "sla_calendar_override_history", "values": [
+        { "column": "calendar_override_id", "value": "{{current_override.id}}" }, { "column": "calendar_id", "value": "{{current_override.calendar_id}}" },
+        { "column": "override_date", "value": "{{current_override.override_date}}" }, { "column": "override_type", "value": "{{current_override.override_type}}" },
+        { "column": "is_business_day", "value": "{{current_override.is_business_day}}" }, { "column": "description", "value": "{{current_override.description}}" },
+        { "column": "status", "value": "{{$_POST.status}}" }, { "column": "action_code", "value": "{{status_action}}" }, { "column": "changed_by", "value": "{{identity}}" }
+      ] } } },
+      { "name": "audit_status_changed", "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [
+        { "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "{{'sla.calendar_override.' + ($_POST.status == 'active' ? 'activated' : 'deactivated')}}" },
+        { "column": "module", "value": "sla" }, { "column": "entity_type", "value": "sla_calendar_override" }, { "column": "entity_id", "value": "{{current_override.id}}" },
+        { "column": "description", "value": "{{'Calendar override ' + current_override.override_date + ' ' + $_POST.status + '.'}}" }, { "column": "created_at", "value": "{{NOW}}" }
+      ] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "override_id": "{{current_override.id}}", "status": "{{$_POST.status}}" } } }
+  ], "catch": [
+    { "module": "core", "action": "condition", "options": { "if": "{{$_EXCEPTION.message == 'SLA_OVERRIDE_STATUS_CONFLICT'}}", "then": { "steps": [
+      { "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The calendar override status changed. Reload the list and try again." } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Calendar override status could not be changed. No partial changes were committed." } } }
+  ] }
+}

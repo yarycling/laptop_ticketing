@@ -1,0 +1,106 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{identity}}",
+          "then": {
+            "steps": [
+              {
+                "name": "audit_logout",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "logout"
+                      },
+                      {
+                        "column": "module",
+                        "value": "security"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "user"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "User signed out."
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "logout",
+        "module": "auth",
+        "action": "logout",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "redirect": "/login"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

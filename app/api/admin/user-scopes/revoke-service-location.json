@@ -1,0 +1,13 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [{ "name": "scope_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "user_scopes.manage" } }, "output": true },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_POST.scope_id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "A service-location scope is required." } } }] } } },
+    { "name": "revoke", "module": "dbupdater", "action": "update", "options": { "connection": "db", "sql": { "table": "user_service_location_scopes", "values": [{ "column": "status", "value": "revoked" }, { "column": "revoked_at", "value": "{{NOW}}" }, { "column": "revoked_by", "value": "{{identity}}" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.scope_id}}" }, { "data": { "column": "status" }, "operation": "=", "value": "active" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{revoke.affected != 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Active service-location scope was not found." } } }] } } },
+    { "name": "audit", "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "scope.service_location.revoked" }, { "column": "module", "value": "organisation" }, { "column": "entity_type", "value": "service_location_scope" }, { "column": "entity_id", "value": "{{$_POST.scope_id}}" }, { "column": "description", "value": "Repair Centre service-location scope revoked." }, { "column": "created_at", "value": "{{NOW}}" }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Repair Centre scope could not be revoked." } } }] }
+}

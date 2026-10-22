@@ -1,0 +1,707 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "id",
+        "type": "number"
+      },
+      {
+        "name": "manufacturer_id",
+        "type": "number"
+      },
+      {
+        "name": "model_name",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "model_image_validation",
+        "module": "validator",
+        "action": "validate",
+        "options": {
+          "noError": true,
+          "data": [
+            {
+              "name": "model_image",
+              "value": "{{$_POST.model_image}}",
+              "rules": {
+                "upload:maxfiles": {
+                  "param": 1,
+                  "message": "Select no more than one model image."
+                },
+                "upload:accept": {
+                  "param": ".jpg,.jpeg,.png,.webp,.avif",
+                  "message": "Use a JPG, PNG, WebP, or AVIF image."
+                },
+                "upload:maxtotalsize": {
+                  "param": 5242880,
+                  "message": "The model image must be 5 MB or smaller."
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!model_image_validation}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Use one JPG, PNG, WebP, or AVIF image no larger than 5 MB."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "generated_timestamp",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_timestamp",
+          "value": "{{toTimestamp(NOW)}}"
+        }
+      },
+      {
+        "name": "generated_code",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_code",
+          "value": "{{'P4BMODEL' + generated_timestamp}}"
+        }
+      },
+      {
+        "name": "code_match",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "device_models",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "model_code"
+                  },
+                  "operation": "=",
+                  "value": "{{generated_code}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "while",
+        "options": {
+          "while": "{{code_match.id}}",
+          "max": 100000,
+          "exec": {
+            "steps": [
+              {
+                "name": "generated_timestamp",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "generated_timestamp",
+                  "value": "{{generated_timestamp + 1}}"
+                }
+              },
+              {
+                "name": "generated_code",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "generated_code",
+                  "value": "{{'P4BMODEL' + generated_timestamp}}"
+                }
+              },
+              {
+                "name": "code_match",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "device_models",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "model_code"
+                          },
+                          "operation": "=",
+                          "value": "{{generated_code}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "model_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "model_name",
+          "value": "{{($_POST.model_name || '').trim()}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.manufacturer_id || $_POST.manufacturer_id < 1 || !model_name || model_name.length() > 180}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Manufacturer and model name are required within their length limits."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "existing",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "device_models",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "manufacturer_id"
+                      },
+                      {
+                        "column": "image_path"
+                      },
+                      {
+                        "column": "image_available"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!existing.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 404,
+                          "data": {
+                            "success": false,
+                            "error": "Model was not found."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "manufacturer",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "manufacturers",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.manufacturer_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!manufacturer.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Select an existing manufacturer."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{(!$_POST.id || existing.manufacturer_id != $_POST.manufacturer_id) && manufacturer.status != 'active'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Select an active manufacturer."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "duplicate",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "device_models",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "manufacturer_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.manufacturer_id}}"
+                },
+                {
+                  "data": {
+                    "column": "model_code"
+                  },
+                  "operation": "=",
+                  "value": "{{generated_code}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_POST.id ? $_POST.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{duplicate.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Model code already exists for this manufacturer."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "stored_model_image",
+        "module": "upload",
+        "action": "upload",
+        "output": true,
+        "options": {
+          "fields": [
+            "model_image"
+          ],
+          "path": "/storage/model-images",
+          "template": "{guid}.{ext}",
+          "throwErrors": true,
+          "createPath": true
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "save_model",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "update_model",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_models",
+                            "values": [
+                              {
+                                "column": "manufacturer_id",
+                                "value": "{{$_POST.manufacturer_id}}"
+                              },
+                              {
+                                "column": "model_name",
+                                "value": "{{model_name}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "image_path",
+                                "value": "{{stored_model_image && stored_model_image.length > 0 ? stored_model_image[0].path : existing.image_path}}"
+                              },
+                              {
+                                "column": "image_available",
+                                "value": "{{stored_model_image && stored_model_image.length > 0 ? 1 : existing.image_available}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{$_POST.id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_model_updated",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "model_updated"
+                              },
+                              {
+                                "column": "module",
+                                "value": "device_catalogue"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "device_model"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{$_POST.id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Device model updated."
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "save_model",
+                "module": "dbupdater",
+                "action": "transaction",
+                "options": {
+                  "connection": "db",
+                  "exec": {
+                    "steps": [
+                      {
+                        "name": "create_model",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_models",
+                            "values": [
+                              {
+                                "column": "manufacturer_id",
+                                "value": "{{$_POST.manufacturer_id}}"
+                              },
+                              {
+                                "column": "model_code",
+                                "value": "{{generated_code}}"
+                              },
+                              {
+                                "column": "model_name",
+                                "value": "{{model_name}}"
+                              },
+                              {
+                                "column": "status",
+                                "value": "active"
+                              },
+                              {
+                                "column": "created_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "image_path",
+                                "value": "{{stored_model_image && stored_model_image.length > 0 ? stored_model_image[0].path : null}}"
+                              },
+                              {
+                                "column": "image_available",
+                                "value": "{{stored_model_image && stored_model_image.length > 0 ? 1 : 0}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_model_created",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "model_created"
+                              },
+                              {
+                                "column": "module",
+                                "value": "device_catalogue"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "device_model"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{create_model.identity}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Device model created."
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

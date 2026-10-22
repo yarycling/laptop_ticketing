@@ -1,0 +1,475 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "number",
+        "name": "user_id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "user_scopes.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.user_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "User is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "user",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "username"
+              },
+              {
+                "column": "email"
+              },
+              {
+                "column": "display_name"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.user_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!user.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "User not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "roles",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "r",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "national_scopes",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_national_scopes",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "assigned_at"
+              },
+              {
+                "column": "revoked_at"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "district_scopes",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_district_scopes",
+              "alias": "uds"
+            },
+            "columns": [
+              {
+                "table": "uds",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "uds",
+                "column": "status",
+                "alias": "status"
+              },
+              {
+                "table": "uds",
+                "column": "assigned_at",
+                "alias": "assigned_at"
+              },
+              {
+                "table": "uds",
+                "column": "revoked_at",
+                "alias": "revoked_at"
+              },
+              {
+                "table": "d",
+                "column": "id",
+                "alias": "district_id"
+              },
+              {
+                "table": "d",
+                "column": "name",
+                "alias": "district_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "districts",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "uds",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "uds",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "d",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_scopes",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_school_scopes",
+              "alias": "uss"
+            },
+            "columns": [
+              {
+                "table": "uss",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "uss",
+                "column": "status",
+                "alias": "status"
+              },
+              {
+                "table": "uss",
+                "column": "assigned_at",
+                "alias": "assigned_at"
+              },
+              {
+                "table": "uss",
+                "column": "revoked_at",
+                "alias": "revoked_at"
+              },
+              {
+                "table": "s",
+                "column": "id",
+                "alias": "school_id"
+              },
+              {
+                "table": "s",
+                "column": "name",
+                "alias": "school_name"
+              },
+              {
+                "table": "d",
+                "column": "name",
+                "alias": "district_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "schools",
+                "alias": "s",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "s",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "uss",
+                        "column": "school_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "districts",
+                "alias": "d",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "d",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "s",
+                        "column": "district_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "uss",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{user.id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "s",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "service_location_scopes",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": { "name": "user_service_location_scopes", "alias": "uss" },
+            "columns": [
+              { "table": "uss", "column": "id", "alias": "id" },
+              { "table": "uss", "column": "status", "alias": "status" },
+              { "table": "uss", "column": "assigned_at", "alias": "assigned_at" },
+              { "table": "uss", "column": "revoked_at", "alias": "revoked_at" },
+              { "table": "sl", "column": "id", "alias": "service_location_id" },
+              { "table": "sl", "column": "code", "alias": "code" },
+              { "table": "sl", "column": "name", "alias": "name" }
+            ],
+            "joins": [{
+              "table": "service_locations", "alias": "sl", "type": "inner",
+              "clauses": { "condition": "AND", "rules": [{
+                "table": "sl", "column": "id", "operation": "=", "value": { "table": "uss", "column": "service_location_id" }
+              }] }
+            }],
+            "wheres": { "condition": "AND", "rules": [{
+              "data": { "table": "uss", "column": "user_id" }, "operation": "=", "value": "{{user.id}}"
+            }] },
+            "orders": [{ "table": "sl", "column": "name", "direction": "asc" }]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "user": "{{user}}",
+            "roles": "{{roles.flatten('name')}}",
+            "national_scopes": "{{national_scopes}}",
+            "district_scopes": "{{district_scopes}}",
+            "school_scopes": "{{school_scopes}}",
+            "service_location_scopes": "{{service_location_scopes}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

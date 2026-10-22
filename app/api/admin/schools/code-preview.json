@@ -1,0 +1,171 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "number",
+        "name": "id"
+      },
+      {
+        "type": "text",
+        "name": "name"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "schools.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "school_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_name",
+          "value": "{{$_GET.name ? $_GET.name.trim() : ''}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school_name}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "code": ""
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_code_base",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_code_base",
+          "value": "{{school_name.slugify().uppercase() || 'SCHOOL'}}"
+        }
+      },
+      {
+        "name": "matching_school_code_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "schools",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "school_code"
+                  },
+                  "operation": "=",
+                  "value": "{{school_code_base}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_GET.id ? $_GET.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "school_code_suffix_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "schools",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "school_code"
+                  },
+                  "operator": "begins_with",
+                  "value": "{{school_code_base + '-'}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_GET.id ? $_GET.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "generated_school_code",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_school_code",
+          "value": "{{matching_school_code_count > 0 ? school_code_base + '-' + (school_code_suffix_count + 1) : school_code_base}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "code": "{{generated_school_code}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

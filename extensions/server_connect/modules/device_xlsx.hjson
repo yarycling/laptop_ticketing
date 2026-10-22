@@ -1,0 +1,57 @@
+[
+  {
+    "type": "device_xlsx_generateTemplate",
+    "module": "device_xlsx",
+    "action": "generateTemplate",
+    "groupTitle": "Device Import Excel Adapter",
+    "groupIcon": "fas fa-lg fa-file-excel comp-files",
+    "title": "Generate XLSX Template: @@var(deviceXlsxTemplateName)@@",
+    "icon": "fas fa-lg fa-file-excel comp-files",
+    "state": "opened",
+    "dataPick": true,
+    "dataPickObject": true,
+    "dataScheme": [
+      { "name": "path", "type": "text" },
+      { "name": "filename", "type": "text" },
+      { "name": "row_limit", "type": "number" }
+    ],
+    "properties": [
+      {
+        "group": "Workbook Inputs",
+        "variables": [
+          { "name": "deviceXlsxTemplateName", "optionName": "name", "title": "Name", "type": "text", "required": true, "defaultValue": "", "baseName": "deviceXlsxTemplate" },
+          { "name": "deviceXlsxManufacturers", "optionName": "manufacturers", "title": "Manufacturers", "type": "text", "required": true, "serverDataBindings": true, "defaultValue": "" },
+          { "name": "deviceXlsxModels", "optionName": "models", "title": "Models", "type": "text", "required": true, "serverDataBindings": true, "defaultValue": "" },
+          { "name": "deviceXlsxConditions", "optionName": "conditions", "title": "Conditions", "type": "text", "required": true, "serverDataBindings": true, "defaultValue": "" },
+          { "name": "deviceXlsxOutputPath", "optionName": "path", "title": "Temporary Output Path", "type": "text", "required": true, "serverDataBindings": true, "defaultValue": "" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "device_xlsx_parseWorkbook",
+    "module": "device_xlsx",
+    "action": "parseWorkbook",
+    "groupTitle": "Device Import Excel Adapter",
+    "groupIcon": "fas fa-lg fa-file-excel comp-files",
+    "title": "Parse XLSX Workbook: @@var(deviceXlsxParseName)@@",
+    "icon": "fas fa-lg fa-file-excel comp-files",
+    "state": "opened",
+    "dataPick": true,
+    "dataPickObject": true,
+    "dataScheme": [
+      { "name": "success", "type": "boolean" },
+      { "name": "row_count", "type": "number" },
+      { "name": "rows", "type": "array" }
+    ],
+    "properties": [
+      {
+        "group": "Workbook Input",
+        "variables": [
+          { "name": "deviceXlsxParseName", "optionName": "name", "title": "Name", "type": "text", "required": true, "defaultValue": "", "baseName": "deviceXlsxParse" },
+          { "name": "deviceXlsxInputPath", "optionName": "path", "title": "Uploaded Workbook Path", "type": "text", "required": true, "serverDataBindings": true, "defaultValue": "" }
+        ]
+      }
+    ]
+  }
+]

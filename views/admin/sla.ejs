@@ -1,0 +1,180 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="slaManagement" appconnect="local" components="{dmxBootstrap5Modal:{},dmxDatePicker:{}}" jquery_slim_35="cdn" moment_2="cdn" -->
+<meta name="ac:route" content="/admin/sla">
+<div class="portal-shell logistics-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="policyList" url="/api/sla/policies/list" dmx-param:search="policySearch.value" dmx-param:status="policyStatusFilter.value"></dmx-serverconnect>
+  <dmx-serverconnect id="calendarList" url="/api/sla/calendar/list" dmx-param:search="calendarSearch.value" dmx-param:status="calendarStatusFilter.value"></dmx-serverconnect>
+  <dmx-serverconnect id="policyDetail" url="/api/sla/policies/detail" noload="true"></dmx-serverconnect>
+  <dmx-value id="slaNotice" value=""></dmx-value>
+  <dmx-value id="policyId" value=""></dmx-value>
+  <dmx-value id="policyCode" value=""></dmx-value>
+  <dmx-value id="policyName" value=""></dmx-value>
+  <dmx-value id="policyDescription" value=""></dmx-value>
+  <dmx-value id="policyCalendar" value=""></dmx-value>
+  <dmx-value id="policyTarget" value="1"></dmx-value>
+  <dmx-value id="policyStatus" value="active"></dmx-value>
+  <dmx-value id="policySort" value="100"></dmx-value>
+  <dmx-value id="overrideId" value=""></dmx-value>
+  <dmx-value id="overrideDate" value=""></dmx-value>
+  <dmx-value id="overrideType" value="PUBLIC_HOLIDAY"></dmx-value>
+  <dmx-value id="overrideBusinessDay" value="0"></dmx-value>
+  <dmx-value id="overrideDescription" value=""></dmx-value>
+  <dmx-value id="overrideStatus" value="active"></dmx-value>
+  <dmx-value id="overrideIntent" value=""></dmx-value>
+  <%- await include("../partials/portal-sidebar", { currentPage: "sla" }) %>
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "SLA Management" }) %>
+    <main class="portal-main logistics-page sla-page" aria-label="SLA management">
+      <div class="logistics-breadcrumb" aria-label="Breadcrumb"><a href="/" aria-label="Home"><i class="fas fa-home" aria-hidden="true"></i></a><i class="fas fa-chevron-right" aria-hidden="true"></i><a href="/admin/organisation">Administration</a><i class="fas fa-chevron-right" aria-hidden="true"></i><strong>SLA Management</strong></div>
+      <header class="logistics-heading"><div class="logistics-heading-icon"><i class="fas fa-stopwatch" aria-hidden="true"></i></div><div><h1>SLA Management</h1><p>Configure service targets, business calendars and date overrides.</p></div></header>
+
+      <section class="logistics-stats" aria-label="SLA configuration summary">
+        <article class="logistics-stat-card"><div class="logistics-stat-icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Total Policies</span><strong dmx-text="policyList.data.all_total || 0"></strong><small>Configured service targets</small></div><span class="logistics-stat-arrow"><i class="fas fa-layer-group" aria-hidden="true"></i></span></article>
+        <article class="logistics-stat-card"><div class="logistics-stat-icon logistics-stat-icon-box"><i class="fas fa-check-circle" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Active Policies</span><strong dmx-text="policyList.data.active_total || 0"></strong><small>Currently in effect</small></div><span class="logistics-stat-arrow"><i class="fas fa-chevron-right" aria-hidden="true"></i></span></article>
+        <article class="logistics-stat-card"><div class="logistics-stat-icon logistics-stat-icon-repair"><i class="fas fa-calendar-alt" aria-hidden="true"></i></div><div class="logistics-stat-copy"><span>Date Overrides</span><strong dmx-text="calendarList.data.overrides.count()"></strong><small>Configured calendar dates</small></div><span class="logistics-stat-arrow logistics-stat-arrow-blue"><i class="fas fa-chevron-right" aria-hidden="true"></i></span></article>
+      </section>
+
+      <div class="alert logistics-success" role="status" dmx-show="slaNotice.value"><span class="logistics-success-icon"><i class="fas fa-check" aria-hidden="true"></i></span><span dmx-text="slaNotice.value"></span></div>
+      <div class="alert alert-danger logistics-error" role="alert" dmx-show="policySave.lastError.status || overrideSave.lastError.status || overrideStatusForm.lastError.status" dmx-text="policySave.lastError.response && policySave.lastError.response.error ? policySave.lastError.response.error : overrideSave.lastError.response && overrideSave.lastError.response.error ? overrideSave.lastError.response.error : overrideStatusForm.lastError.response && overrideStatusForm.lastError.response.error ? overrideStatusForm.lastError.response.error : 'SLA configuration could not be saved.'"></div>
+
+      <section class="logistics-card logistics-table-card sla-policy-card" aria-labelledby="policiesTitle">
+        <header class="logistics-table-heading sla-table-heading"><div class="logistics-card-heading"><span class="logistics-list-icon"><i class="fas fa-stopwatch" aria-hidden="true"></i></span><div><h2 id="policiesTitle">SLA Policies</h2><p>Service targets and their current version.</p></div></div><div class="sla-filter-controls"><label class="logistics-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search SLA policies</span><input id="policySearch" type="search" placeholder="Search policies..." dmx-on:input.debounce:300="policyList.load()"></label><select id="policyStatusFilter" class="form-select sla-filter-select" aria-label="Filter SLA policies by status" dmx-on:change="policyList.load()"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select><button type="button" class="btn btn-bmobile-primary" dmx-show="authContext.data.can_sla_manage" dmx-on:click="policyId.setValue('');policyCode.setValue('');policyName.setValue('');policyDescription.setValue('');policyCalendar.setValue(calendarList.data.calendars[0].id);policyTarget.setValue(1);policyStatus.setValue('active');policySort.setValue(100);policyModal.show()"><i class="fas fa-plus" aria-hidden="true"></i>Add Policy</button></div></header>
+        <div class="table-responsive"><table class="table align-middle logistics-table sla-table"><thead><tr><th>Policy</th><th>Target</th><th>Calendar</th><th>Status</th><th>Version</th><th>Actions</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="policyList.data.policies"><tr><td><strong dmx-text="name"></strong><div class="small text-muted" dmx-text="policy_code"></div></td><td><span class="sla-target" dmx-text="target_business_days"></span> business day(s)</td><td dmx-text="calendar_name"></td><td><span class="logistics-status-pill" dmx-class:logistics-status-inactive="status != 'active'"><i class="fas fa-circle" aria-hidden="true"></i><span dmx-text="status == 'active' ? 'Active' : 'Inactive'"></span></span></td><td><span class="sla-version" dmx-text="'v' + version_number"></span></td><td class="text-nowrap"><div class="logistics-row-actions"><button type="button" class="btn btn-bmobile-secondary logistics-edit-button" dmx-on:click="policyDetail.load({policy_id:policy_id}, true);policyHistoryModal.show()"><i class="fas fa-history" aria-hidden="true"></i>History</button><button type="button" class="btn btn-bmobile-secondary logistics-edit-button" dmx-show="authContext.data.can_sla_manage" dmx-on:click="policyId.setValue(policy_id);policyCode.setValue(policy_code);policyName.setValue(name);policyDescription.setValue(description);policyCalendar.setValue(calendar_id);policyTarget.setValue(target_business_days);policyStatus.setValue(status);policySort.setValue(sort_order);policyModal.show()"><i class="fas fa-pen" aria-hidden="true"></i>Edit</button></div></td></tr></tbody></table></div>
+        <p class="logistics-empty" dmx-show="policyList.data.policies.count() == 0" dmx-text="policySearch.value || policyStatusFilter.value ? 'No SLA policies match these filters.' : 'No SLA policies are configured.'"></p>
+      </section>
+
+      <section class="logistics-card sla-calendar-card" aria-labelledby="businessCalendarTitle">
+        <div class="sla-calendar-toolbar"><header class="logistics-card-heading sla-section-heading"><span class="logistics-list-icon"><i class="fas fa-calendar-alt" aria-hidden="true"></i></span><div><h2 id="businessCalendarTitle">Business Calendar</h2><p>Weekday rules and explicit date overrides. No public holidays are assumed until configured.</p></div></header><div class="sla-filter-controls sla-calendar-filters"><label class="logistics-search"><i class="fas fa-search" aria-hidden="true"></i><span class="visually-hidden">Search business calendars</span><input id="calendarSearch" type="search" placeholder="Search calendars..." dmx-on:input.debounce:300="calendarList.load()"></label><select id="calendarStatusFilter" class="form-select sla-filter-select" aria-label="Filter business calendars by status" dmx-on:change="calendarList.load()"><option value="">All statuses</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div></div>
+        <div class="sla-calendar-grid" is="dmx-repeat" dmx-bind:repeat="calendarList.data.filtered_calendars"><article class="sla-calendar-item"><div class="sla-calendar-title"><h3 dmx-text="name"></h3><span class="carrier-default-pill carrier-default-yes" dmx-show="is_default == 1">Default</span></div><p dmx-text="description"></p><div class="sla-weekday-list" is="dmx-repeat" dmx-bind:repeat="calendarList.data.weekdays.where('calendar_id', '==', id)"><span class="sla-weekday-pill" dmx-class:sla-weekday-closed="is_business_day != 1"><i class="fas" dmx-class:fa-briefcase="is_business_day == 1" dmx-class:fa-moon="is_business_day != 1" aria-hidden="true"></i><span dmx-text="weekday_name + ': ' + (is_business_day == 1 ? 'Business day' : 'Closed')"></span></span></div></article></div>
+        <p class="logistics-empty" dmx-show="calendarList.data.filtered_calendars.count() == 0">No business calendars match these filters.</p>
+
+        <div class="logistics-table-heading sla-override-heading"><div class="logistics-card-heading"><span class="logistics-list-icon"><i class="fas fa-calendar-day" aria-hidden="true"></i></span><div><h2>Date Overrides</h2><p>Specific dates that change the normal business calendar.</p></div></div><button type="button" class="btn btn-bmobile-primary" dmx-show="authContext.data.can_sla_manage" dmx-on:click="overrideIntent.setValue('');overrideId.setValue('');overrideDate.setValue('');overrideType.setValue('PUBLIC_HOLIDAY');overrideBusinessDay.setValue(0);overrideDescription.setValue('');overrideStatus.setValue('active');overrideSave.reset(true);overrideModal.show()"><i class="fas fa-plus" aria-hidden="true"></i>Add Override</button></div>
+        <div class="table-responsive"><table class="table align-middle logistics-table sla-table"><thead><tr><th>Date</th><th>Type</th><th>Calendar day</th><th>Description</th><th>Status</th><th dmx-show="authContext.data.can_sla_manage">Actions</th></tr></thead><tbody is="dmx-repeat" dmx-bind:repeat="calendarList.data.overrides"><tr dmx-show="calendar_id == calendarList.data.calendars[0].id"><td class="text-nowrap" dmx-text="override_date.formatDate('MMM d, yyyy')"></td><td dmx-text="override_type == 'PUBLIC_HOLIDAY' ? 'Public holiday' : override_type == 'EXCEPTIONAL_CLOSURE' ? 'Exceptional closure' : 'Exceptional working day'"></td><td><span class="sla-day-pill" dmx-class:sla-day-business="is_business_day == 1" dmx-text="is_business_day == 1 ? 'Business day' : 'Closed'"></span></td><td dmx-text="description"></td><td><span class="logistics-status-pill" dmx-class:logistics-status-inactive="status != 'active'"><i class="fas fa-circle" aria-hidden="true"></i><span dmx-text="status == 'active' ? 'Active' : 'Inactive'"></span></span></td><td class="text-nowrap" dmx-show="authContext.data.can_sla_manage"><div class="logistics-row-actions"><button type="button" class="btn btn-bmobile-secondary logistics-edit-button" dmx-on:click="overrideIntent.setValue('edit');overrideId.setValue(id);overrideDate.setValue(override_date);overrideType.setValue(override_type);overrideBusinessDay.setValue(is_business_day);overrideDescription.setValue(description);overrideStatus.setValue(status);overrideModal.show()"><i class="fas fa-pen" aria-hidden="true"></i>Edit</button><button type="button" class="btn btn-bmobile-secondary logistics-edit-button" dmx-show="status == 'active'" dmx-on:click="overrideIntent.setValue('deactivate');overrideId.setValue(id);overrideDate.setValue(override_date);overrideType.setValue(override_type);overrideBusinessDay.setValue(is_business_day);overrideDescription.setValue(description);overrideStatus.setValue('inactive');overrideModal.show()"><i class="fas fa-power-off" aria-hidden="true"></i>Deactivate</button><button type="button" class="btn btn-bmobile-secondary logistics-edit-button" dmx-show="status == 'inactive'" dmx-on:click="overrideIntent.setValue('activate');overrideId.setValue(id);overrideDate.setValue(override_date);overrideType.setValue(override_type);overrideBusinessDay.setValue(is_business_day);overrideDescription.setValue(description);overrideStatus.setValue('active');overrideModal.show()"><i class="fas fa-power-off" aria-hidden="true"></i>Activate</button></div></td></tr></tbody></table></div>
+        <p class="logistics-empty" dmx-show="calendarList.data.overrides.count() == 0">No date overrides configured.</p>
+      </section>
+    </main>
+  </div>
+
+  <div id="overrideModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="overrideModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content portal-modal">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="overrideModalTitle" dmx-text="overrideIntent.value == 'deactivate' ? 'Deactivate Date Override' : overrideIntent.value == 'activate' ? 'Activate Date Override' : overrideId.value ? 'Edit Date Override' : 'Add Date Override'"></h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="overrideSave" is="dmx-serverconnect-form" method="post" action="/api/sla/calendar/overrides/save" dmx-show="authContext.data.can_sla_manage && overrideIntent.value != 'deactivate' && overrideIntent.value != 'activate'" dmx-on:success="overrideModal.hide();calendarList.load();overrideSave.reset(true);slaNotice.setValue('Calendar override saved.');overrideId.setValue('');overrideStatus.setValue('active');overrideIntent.setValue('')">
+          <div class="modal-body">
+            <input type="hidden" name="override_id" dmx-bind:value="overrideId.value">
+            <input type="hidden" name="status" dmx-bind:value="overrideStatus.value">
+            <div class="alert alert-danger" role="alert" dmx-show="overrideSave.lastError.status" dmx-text="overrideSave.lastError.response && overrideSave.lastError.response.error ? overrideSave.lastError.response.error : 'Calendar override could not be saved.'"></div>
+            <div dmx-show="overrideIntent.value != 'deactivate' && overrideIntent.value != 'activate'">
+            <div class="mb-3">
+              <label class="form-label" for="overrideDateInput">Date</label>
+              <input id="overrideDateInput" name="override_date" type="text" class="form-control" dmx-bind:value="overrideDate.value" dmx-bind:required="overrideIntent.value != 'deactivate' && overrideIntent.value != 'activate'" is="dmx-date-picker" format="YYYY-MM-DD">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="overrideTypeInput">Type</label>
+              <select id="overrideTypeInput" name="override_type" class="form-select" dmx-bind:value="overrideType.value" dmx-on:change="overrideBusinessDay.setValue(this.value == 'EXCEPTIONAL_WORKING_DAY' ? 1 : 0)">
+                <option value="PUBLIC_HOLIDAY">Public holiday</option>
+                <option value="EXCEPTIONAL_CLOSURE">Exceptional closure</option>
+                <option value="EXCEPTIONAL_WORKING_DAY">Exceptional working day</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="overrideBusinessInput">Business day?</label>
+              <select id="overrideBusinessInput" name="is_business_day" class="form-select" dmx-bind:value="overrideBusinessDay.value">
+                <option value="0">No</option>
+                <option value="1">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label" for="overrideDescriptionInput">Description</label>
+              <input id="overrideDescriptionInput" name="description" class="form-control" maxlength="500" dmx-bind:value="overrideDescription.value" dmx-bind:required="overrideIntent.value != 'deactivate' && overrideIntent.value != 'activate'">
+            </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-bmobile-secondary" data-bs-dismiss="modal" dmx-on:click="overrideIntent.setValue('');overrideId.setValue('');overrideSave.reset(true)">Cancel</button>
+            <button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="overrideSave.state.executing" dmx-text="overrideIntent.value == 'deactivate' ? 'Confirm Deactivation' : overrideIntent.value == 'activate' ? 'Confirm Activation' : overrideId.value ? 'Save Override' : 'Add Override'"></button>
+          </div>
+        </form>
+        <form id="overrideStatusForm" is="dmx-serverconnect-form" method="post" action="/api/sla/calendar/overrides/status" dmx-show="authContext.data.can_sla_manage && (overrideIntent.value == 'deactivate' || overrideIntent.value == 'activate')" dmx-on:success="overrideModal.hide();calendarList.load();overrideStatusForm.reset(true);slaNotice.setValue(overrideIntent.value == 'deactivate' ? 'Calendar override deactivated.' : 'Calendar override activated.');overrideId.setValue('');overrideStatus.setValue('active');overrideIntent.setValue('')">
+          <div class="modal-body">
+            <input type="hidden" name="override_id" dmx-bind:value="overrideId.value">
+            <input type="hidden" name="status" dmx-bind:value="overrideStatus.value">
+            <div class="alert alert-danger" role="alert" dmx-show="overrideStatusForm.lastError.status" dmx-text="overrideStatusForm.lastError.response && overrideStatusForm.lastError.response.error ? overrideStatusForm.lastError.response.error : 'Calendar override status could not be changed.'"></div>
+            <div class="alert alert-warning mb-0" role="status" dmx-text="'Confirm ' + overrideIntent.value + ' of the ' + overrideDate.value.formatDate('MMM d, yyyy') + ' calendar override: ' + overrideDescription.value + '?'">Confirm status change.</div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-bmobile-secondary" data-bs-dismiss="modal" dmx-on:click="overrideIntent.setValue('');overrideId.setValue('');overrideStatusForm.reset(true)">Cancel</button>
+            <button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="overrideStatusForm.state.executing" dmx-text="overrideIntent.value == 'deactivate' ? 'Confirm Deactivation' : 'Confirm Activation'"></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="policyModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="policyModalTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content portal-modal">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="policyModalTitle" dmx-text="policyId.value ? 'Edit SLA Policy' : 'Add SLA Policy'"></h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="policySave" is="dmx-serverconnect-form" method="post" action="/api/sla/policies/save" dmx-on:success="policyModal.hide();policySave.reset(true);policyList.load();slaNotice.setValue('SLA policy version saved.')">
+          <div class="modal-body"><input type="hidden" name="policy_id" dmx-bind:value="policyId.value">
+            <div class="mb-3" dmx-show="!policyId.value"><label class="form-label" for="policyCodeInput">Policy code</label><input id="policyCodeInput" name="policy_code" class="form-control" maxlength="50" pattern="[A-Za-z0-9_-]+" dmx-bind:value="policyCode.value" dmx-bind:required="!policyId.value"></div>
+            <div class="mb-3"><label class="form-label" for="policyNameInput">Name</label><input id="policyNameInput" name="name" class="form-control" maxlength="180" dmx-bind:value="policyName.value" required></div>
+            <div class="mb-3"><label class="form-label" for="policyDescriptionInput">Description</label><textarea id="policyDescriptionInput" name="description" class="form-control" rows="2" maxlength="1000" dmx-bind:value="policyDescription.value"></textarea></div>
+            <div class="row g-3">
+              <div class="col-6"><label class="form-label" for="policyTargetInput">Target business days</label><input id="policyTargetInput" name="target_business_days" class="form-control" type="number" min="1" max="365" step="1" dmx-bind:value="policyTarget.value" required></div>
+              <div class="col-6"><label class="form-label" for="policyStatusInput">Status</label><select id="policyStatusInput" name="status" class="form-select" dmx-bind:value="policyStatus.value">
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select></div>
+            </div>
+            <div class="mt-3"><label class="form-label" for="policyCalendarInput">Business calendar</label><select id="policyCalendarInput" name="calendar_id" class="form-select" dmx-bind:value="policyCalendar.value" required>
+                <option dmx-repeat="calendarList.data.calendars" dmx-bind:value="id" dmx-text="name" dmx-bind:disabled="status != 'active'"></option>
+              </select></div>
+            <input type="hidden" name="sort_order" dmx-bind:value="policySort.value">
+            <p class="small text-muted mt-3 mb-0" dmx-show="policyId.value">Saving creates a new immutable policy version; earlier targets remain available in history.</p>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-bmobile-secondary" data-bs-dismiss="modal">Cancel</button><button class="btn btn-bmobile-primary" type="submit" dmx-bind:disabled="policySave.state.executing">Save Policy</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="policyHistoryModal" is="dmx-bs5-modal" class="modal" tabindex="-1" aria-labelledby="policyHistoryTitle" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content portal-modal">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="policyHistoryTitle">Policy Version History</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>Version</th>
+                  <th>Target</th>
+                  <th>Calendar</th>
+                  <th>Status</th>
+                  <th>Recorded</th>
+                </tr>
+              </thead>
+              <tbody is="dmx-repeat" dmx-bind:repeat="policyDetail.data.versions">
+                <tr>
+                  <td dmx-text="'v' + version_number"></td>
+                  <td dmx-text="target_business_days + ' business day(s)'"></td>
+                  <td dmx-text="calendar_name"></td>
+                  <td dmx-text="status"></td>
+                  <td class="text-nowrap"><input type="text" class="form-control-plaintext p-0 text-body" is="dmx-date-picker" format="MMM D, YYYY" dmx-bind:value="created_at" disabled aria-label="Recorded date"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

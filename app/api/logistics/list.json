@@ -1,0 +1,937 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "status_code",
+        "type": "text"
+      },
+      {
+        "name": "district_id",
+        "type": "number"
+      },
+      {
+        "name": "school_id",
+        "type": "number"
+      },
+      {
+        "name": "handoff_state",
+        "type": "text"
+      },
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "page",
+        "type": "number"
+      },
+      {
+        "name": "page_size",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "logistics.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "ttpost_role",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "role_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "TTPOST_LOGISTICS"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "repair_role",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "role_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{($_GET.page && ($_GET.page < 1 || floor($_GET.page) != $_GET.page)) || ($_GET.page_size && ($_GET.page_size < 1 || $_GET.page_size > 100 || floor($_GET.page_size) != $_GET.page_size))}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Page must be a positive integer and page size must be an integer from 1 to 100."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "page",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "page",
+          "value": "{{$_GET.page && $_GET.page > 0 ? floor($_GET.page) : 1}}"
+        }
+      },
+      {
+        "name": "page_size",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "page_size",
+          "value": "{{!$_GET.page_size || $_GET.page_size < 1 ? 25 : ($_GET.page_size > 100 ? 100 : floor($_GET.page_size))}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_GET.status_code && $_GET.status_code != 'ALL'}}",
+          "then": {
+            "steps": [
+              {
+                "name": "status_filter",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "logistics_statuses",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "code"
+                          },
+                          "operation": "=",
+                          "value": "{{$_GET.status_code}}"
+                        },
+                        {
+                          "data": {
+                            "column": "is_active"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!status_filter.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 400,
+                          "data": {
+                            "success": false,
+                            "error": "Choose a valid logistics status."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_GET.handoff_state && $_GET.handoff_state != 'ALL' && $_GET.handoff_state != 'AWAITING_SCHOOL_HANDOFF' && $_GET.handoff_state != 'PENDING_TTPOST_RECEIPT' && $_GET.handoff_state != 'TTPOST_CUSTODY' && $_GET.handoff_state != 'PENDING_REPAIR_CENTRE_RECEIPT' && $_GET.handoff_state != 'REPAIR_CENTRE_CUSTODY' && $_GET.handoff_state != 'PENDING_TTPOST_RETURN_RECEIPT' && $_GET.handoff_state != 'TTPOST_RETURN_CUSTODY' && $_GET.handoff_state != 'PENDING_SCHOOL_RETURN_RECEIPT'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose a valid physical handoff state."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "cases",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_logistics_current_context",
+              "alias": "lc"
+            },
+            "columns": [
+              {
+                "table": "lc",
+                "column": "logistics_case_id"
+              },
+              {
+                "table": "lc",
+                "column": "logistics_number"
+              },
+              {
+                "table": "lc",
+                "column": "ticket_id"
+              },
+              {
+                "table": "lc",
+                "column": "ticket_number"
+              },
+              {
+                "table": "lc",
+                "column": "device_id"
+              },
+              {
+                "table": "lc",
+                "column": "original_device_id"
+              },
+              {
+                "table": "lc",
+                "column": "device_source"
+              },
+              {
+                "table": "lc",
+                "column": "replacement_number"
+              },
+              {
+                "table": "lc",
+                "column": "serial_number"
+              },
+              {
+                "table": "lc",
+                "column": "asset_tag"
+              },
+              {
+                "table": "mf",
+                "column": "name",
+                "alias": "manufacturer_name"
+              },
+              {
+                "table": "m",
+                "column": "model_name"
+              },
+              {
+                "table": "lc",
+                "column": "pickup_school_id"
+              },
+              {
+                "table": "lc",
+                "column": "pickup_school_name"
+              },
+              {
+                "table": "lc",
+                "column": "pickup_district_id"
+              },
+              {
+                "table": "lc",
+                "column": "pickup_district_name"
+              },
+              {
+                "table": "lc",
+                "column": "current_logistics_status_code"
+              },
+              {
+                "table": "lc",
+                "column": "current_logistics_status_name"
+              },
+              {
+                "table": "lc",
+                "column": "ticket_current_status_code"
+              },
+              {
+                "table": "lc",
+                "column": "requested_at"
+              },
+              {
+                "table": "p",
+                "column": "physical_state_code"
+              },
+              {
+                "table": "p",
+                "column": "pending_handoff_id"
+              },
+              {
+                "table": "p",
+                "column": "pending_handoff_type"
+              },
+              {
+                "table": "p",
+                "column": "ttpost_location_name"
+              },
+              {
+                "table": "p",
+                "column": "repair_centre_location_id"
+              },
+              {
+                "table": "p",
+                "column": "repair_centre_location_name"
+              },
+              {
+                "table": "p",
+                "column": "pending_since",
+                "alias": "handoff_dispatched_at"
+              },
+              {
+                "table": "p",
+                "column": "last_handoff_received_at",
+                "alias": "handoff_received_at"
+              }
+            ],
+            "joins": [
+              {
+                "table": "devices",
+                "alias": "dv",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "dv",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "lc",
+                        "column": "device_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "device_models",
+                "alias": "m",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "m",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "device_model_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "v_logistics_physical_custody",
+                "alias": "p",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "p",
+                      "column": "logistics_case_id",
+                      "operation": "=",
+                      "value": {
+                        "table": "lc",
+                        "column": "logistics_case_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "lc",
+                    "column": "active_record_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "table": "lc",
+                    "column": "closed_at"
+                  },
+                  "operator": "is_null"
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status_code && $_GET.status_code != 'ALL'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "current_logistics_status_code"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status_code}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.district_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "pickup_district_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.district_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.school_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "pickup_school_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.school_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.handoff_state && $_GET.handoff_state != 'ALL'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "physical_state_code"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.handoff_state}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "logistics_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "ticket_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "serial_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "asset_tag"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "lc",
+                        "column": "pickup_school_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || ttpost_role.role_name == 'TTPOST_LOGISTICS'}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "lc",
+                            "column": "logistics_case_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name == 'REPAIR_CENTRE' && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "repair_centre_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        },
+                        {
+                          "condition": "OR",
+                          "rules": [
+                            {
+                              "data": {
+                                "table": "p",
+                                "column": "physical_state_code"
+                              },
+                              "operation": "=",
+                              "value": "PENDING_REPAIR_CENTRE_RECEIPT"
+                            },
+                            {
+                              "data": {
+                                "table": "p",
+                                "column": "physical_state_code"
+                              },
+                              "operation": "=",
+                              "value": "REPAIR_CENTRE_CUSTODY"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "lc",
+                            "column": "logistics_case_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "lc",
+                            "column": "pickup_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "lc",
+                            "column": "pickup_school_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.schools.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && repair_role.role_name != 'REPAIR_CENTRE' && ttpost_role.role_name != 'TTPOST_LOGISTICS' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "lc",
+                            "column": "logistics_case_id"
+                          },
+                          "operation": "=",
+                          "value": -1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "lc",
+                "column": "requested_at",
+                "direction": "desc"
+              },
+              {
+                "table": "lc",
+                "column": "logistics_case_id",
+                "direction": "desc"
+              }
+            ],
+            "limit": "{{page_size}}",
+            "offset": "{{(page - 1) * page_size}}"
+          }
+        }
+      },
+      {
+        "name": "display_cases",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{cases}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "accepted_history",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "logistics_status_history",
+                      "alias": "h"
+                    },
+                    "columns": [
+                      {
+                        "table": "h",
+                        "column": "changed_at",
+                        "alias": "accepted_at"
+                      },
+                      {
+                        "table": "u",
+                        "column": "display_name",
+                        "alias": "accepted_by_display_name"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "logistics_statuses",
+                        "alias": "s",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "s",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "h",
+                                "column": "to_status_id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "users",
+                        "alias": "u",
+                        "type": "left",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "u",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "h",
+                                "column": "changed_by_user_id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "h",
+                            "column": "logistics_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{logistics_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "s",
+                            "column": "code"
+                          },
+                          "operation": "=",
+                          "value": "ACCEPTED"
+                        }
+                      ]
+                    },
+                    "limit": 1
+                  }
+                }
+              },
+              {
+                "name": "accepted_at",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "accepted_at",
+                  "value": "{{accepted_history.accepted_at}}"
+                }
+              },
+              {
+                "name": "accepted_by_display_name",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "accepted_by_display_name",
+                  "value": "{{accepted_history.accepted_by_display_name}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "cases": "{{display_cases}}",
+            "page": "{{page}}",
+            "page_size": "{{page_size}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Logistics queue could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

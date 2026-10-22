@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+
+<head>
+  <script src="/dmxAppConnect/dmxAppConnect.js"></script>
+  <script src="/js/inputmask.min.js" defer></script>
+  <script src="/js/dmx-phone-mask.js" defer></script>
+  <meta charset="UTF-8">
+  <title>Laptop Warranty &amp; Repair Management Portal</title>
+
+  <link rel="icon" type="image/png" href="/assets/img/brand/bicon.png">
+  <link rel="apple-touch-icon" href="/assets/img/brand/bicon.png">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.4/css/all.css" integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" crossorigin="anonymous" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="stylesheet" href="/bootstrap/5/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha256-CutOzxCRucUsn6C6TcEYsauvvYilEniTXldPa6/wu0k=" crossorigin="anonymous"></script>
+  <script src="/dmxAppConnect/dmxFormatter/dmxFormatter.js" defer></script>
+  <script src="/dmxAppConnect/dmxRouting/dmxRouting.js" defer></script>
+  <script src="/js/portal.js" defer></script>
+  <script src="/dmxAppConnect/dmxBootstrap5Alert/dmxBootstrap5Alert.js" defer></script>
+  <script src="/dmxAppConnect/dmxBootstrap5Modal/dmxBootstrap5Modal.js" defer></script>
+  <script src="/dmxAppConnect/dmxBootstrap5Toasts/dmxBootstrap5Toasts.js" defer></script>
+
+
+  <link rel="stylesheet" href="/dmxAppConnect/dmxDatePicker/daterangepicker.min.css" />
+  <script src="/dmxAppConnect/dmxDatePicker/daterangepicker.min.js" defer></script>
+  <link rel="stylesheet" href="/dmxAppConnect/dmxDatePicker/dmxDatePicker.css" />
+  <script src="/dmxAppConnect/dmxDatePicker/dmxDatePicker.js" defer></script>
+</head>
+
+<body is="dmx-app" id="main">
+  <main is="dmx-view" id="content">
+    <%- await include(content, locals); %>
+  </main>
+  <script src="/bootstrap/5/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

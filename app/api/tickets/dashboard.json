@@ -1,0 +1,178 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [
+    { "name": "submitted_from", "type": "text" }, { "name": "submitted_to", "type": "text" },
+    { "name": "district_id", "type": "number" }, { "name": "school_id", "type": "number" },
+    { "name": "status_code", "type": "text" }, { "name": "requester_type", "type": "text" }
+  ] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "tickets.dashboard" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "date_validation", "module": "validator", "action": "validate", "options": { "noError": true, "data": [
+      { "name": "submitted_from", "value": "{{$_GET.submitted_from}}", "rules": { "core:date": { "message": "Enter a valid start date." } } },
+      { "name": "submitted_to", "value": "{{$_GET.submitted_to}}", "rules": { "core:date": { "message": "Enter a valid end date." } } }
+    ] } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!date_validation || ($_GET.submitted_from && $_GET.submitted_to && $_GET.submitted_from > $_GET.submitted_to) || ($_GET.district_id && $_GET.district_id < 1) || ($_GET.school_id && $_GET.school_id < 1) || ($_GET.requester_type && $_GET.requester_type != 'STUDENT' && $_GET.requester_type != 'PARENT' && $_GET.requester_type != 'TEACHER' && $_GET.requester_type != 'STAFF')}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "Check the dashboard date, location, and requester filters." } } }] } } },
+    { "name": "metrics", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [
+        { "table": "m", "column": "current_status_code" }, { "table": "m", "column": "current_status_name" },
+        { "table": "m", "column": "is_terminal" }, { "table": "m", "column": "ticket_age_minutes" }, { "table": "m", "column": "ticket_age_bucket" },
+        { "table": "m", "column": "current_status_age_minutes" }, { "table": "m", "column": "time_to_first_diagnosis_minutes" }, { "table": "m", "column": "time_to_approval_minutes" },
+        { "table": "m", "column": "requester_type" }, { "table": "m", "column": "origin_district_id" }, { "table": "district", "column": "name", "alias": "origin_district_name" },
+        { "table": "m", "column": "origin_school_id" }, { "table": "school", "column": "name", "alias": "origin_school_name" },
+        { "table": "m", "column": "assigned_to_user_id" }, { "table": "assignee", "column": "display_name", "alias": "assigned_to_display_name" }
+      ],
+      "joins": [
+        { "table": "districts", "alias": "district", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "district", "column": "id", "operation": "=", "value": { "table": "m", "column": "origin_district_id" } }] } },
+        { "table": "schools", "alias": "school", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "school", "column": "id", "operation": "=", "value": { "table": "m", "column": "origin_school_id" } }] } },
+        { "table": "users", "alias": "assignee", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "assignee", "column": "id", "operation": "=", "value": { "table": "m", "column": "assigned_to_user_id" } }] } }
+      ],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "m", "column": "ticket_id", "direction": "desc" }]
+    } } },
+    { "name": "status_breakdown", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [
+        { "table": "m", "column": "current_status_code" }, { "table": "m", "column": "current_status_name" },
+        { "table": "m", "column": "ticket_id", "aggregate": "count", "alias": "ticket_count" },
+        { "table": "m", "column": "current_status_age_minutes", "aggregate": "avg", "alias": "average_status_age_minutes" }
+      ],
+      "groupBy": [{ "table": "m", "column": "current_status_code" }, { "table": "m", "column": "current_status_name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "m", "column": "current_status_name", "direction": "asc" }]
+    } } },
+    { "name": "district_breakdown", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [
+        { "table": "m", "column": "origin_district_id" }, { "table": "district", "column": "name", "alias": "district_name" },
+        { "table": "m", "column": "ticket_id", "aggregate": "count", "alias": "total_ticket_count" },
+        { "table": "m", "column": "is_terminal", "aggregate": "sum", "alias": "terminal_ticket_count" }
+      ],
+      "joins": [{ "table": "districts", "alias": "district", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "district", "column": "id", "operation": "=", "value": { "table": "m", "column": "origin_district_id" } }] } }],
+      "groupBy": [{ "table": "m", "column": "origin_district_id" }, { "table": "district", "column": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "district", "column": "name", "direction": "asc" }]
+    } } },
+    { "name": "school_breakdown", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [
+        { "table": "m", "column": "origin_school_id" }, { "table": "school", "column": "name", "alias": "school_name" },
+        { "table": "m", "column": "ticket_id", "aggregate": "count", "alias": "total_ticket_count" },
+        { "table": "m", "column": "is_terminal", "aggregate": "sum", "alias": "terminal_ticket_count" }
+      ],
+      "joins": [{ "table": "schools", "alias": "school", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "school", "column": "id", "operation": "=", "value": { "table": "m", "column": "origin_school_id" } }] } }],
+      "groupBy": [{ "table": "m", "column": "origin_school_id" }, { "table": "school", "column": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "school", "column": "name", "direction": "asc" }]
+    } } },
+    { "name": "requester_breakdown", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [{ "table": "m", "column": "requester_type" }, { "table": "m", "column": "ticket_id", "aggregate": "count", "alias": "ticket_count" }],
+      "groupBy": [{ "table": "m", "column": "requester_type" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "m", "column": "requester_type", "direction": "asc" }]
+    } } },
+    { "name": "workload", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "v_ticket_operational_metrics", "alias": "m" },
+      "columns": [{ "table": "m", "column": "assigned_to_user_id" }, { "table": "assignee", "column": "display_name", "alias": "assigned_to_display_name" }, { "table": "m", "column": "ticket_id", "aggregate": "count", "alias": "open_assigned_count" }],
+      "joins": [{ "table": "users", "alias": "assignee", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "assignee", "column": "id", "operation": "=", "value": { "table": "m", "column": "assigned_to_user_id" } }] } }],
+      "groupBy": [{ "table": "m", "column": "assigned_to_user_id" }, { "table": "assignee", "column": "display_name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "m", "column": "is_terminal" }, "operation": "=", "value": 0 },
+        { "data": { "table": "m", "column": "active_assignment_id" }, "operator": "is_not_null" },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_from}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": ">=", "value": "{{$_GET.submitted_from}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.submitted_to}}", "rules": [{ "data": { "table": "m", "column": "submitted_at" }, "operation": "<=", "value": "{{$_GET.submitted_to + ' 23:59:59'}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.school_id}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "=", "value": "{{$_GET.school_id}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.status_code}}", "rules": [{ "data": { "table": "m", "column": "current_status_code" }, "operation": "=", "value": "{{$_GET.status_code}}" }] },
+        { "condition": "AND", "conditional": "{{$_GET.requester_type}}", "rules": [{ "data": { "table": "m", "column": "requester_type" }, "operation": "=", "value": "{{$_GET.requester_type}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "m", "column": "origin_school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length == 0}}", "rules": [{ "data": { "table": "m", "column": "ticket_id" }, "operation": "=", "value": -1 }] }
+        ] }
+      ] },
+      "orders": [{ "table": "assignee", "column": "display_name", "direction": "asc" }]
+    } } },
+    { "name": "total_tickets", "module": "core", "action": "setvalue", "output": true, "options": { "key": "total_tickets", "value": "{{metrics.count()}}" } },
+    { "name": "open_total", "module": "core", "action": "setvalue", "output": true, "options": { "key": "open_total", "value": "{{metrics.where('is_terminal','==',0).count()}}" } },
+    { "name": "terminal_total", "module": "core", "action": "setvalue", "output": true, "options": { "key": "terminal_total", "value": "{{metrics.where('is_terminal','==',1).count()}}" } },
+    { "name": "submitted", "module": "core", "action": "setvalue", "output": true, "options": { "key": "submitted", "value": "{{metrics.where('current_status_code','==','SUBMITTED').count()}}" } },
+    { "name": "needs_clarification", "module": "core", "action": "setvalue", "output": true, "options": { "key": "needs_clarification", "value": "{{metrics.where('current_status_code','==','NEEDS_CLARIFICATION').count()}}" } },
+    { "name": "approved_for_pickup", "module": "core", "action": "setvalue", "output": true, "options": { "key": "approved_for_pickup", "value": "{{metrics.where('current_status_code','==','APPROVED_FOR_PICKUP').count()}}" } },
+    { "name": "assigned_open", "module": "core", "action": "setvalue", "output": true, "options": { "key": "assigned_open", "value": "{{metrics.where('is_terminal','==',0).where('assigned_to_user_id','!=',null).count()}}" } },
+    { "name": "unassigned_open", "module": "core", "action": "setvalue", "output": true, "options": { "key": "unassigned_open", "value": "{{metrics.where('is_terminal','==',0).where('assigned_to_user_id','==',null).count()}}" } },
+    { "name": "average_open_age_minutes", "module": "core", "action": "setvalue", "output": true, "options": { "key": "average_open_age_minutes", "value": "{{metrics.where('is_terminal','==',0).avg('ticket_age_minutes') == null ? null : floor(metrics.where('is_terminal','==',0).avg('ticket_age_minutes'))}}" } },
+    { "name": "average_time_to_first_diagnosis_minutes", "module": "core", "action": "setvalue", "output": true, "options": { "key": "average_time_to_first_diagnosis_minutes", "value": "{{metrics.avg('time_to_first_diagnosis_minutes') == null ? null : floor(metrics.avg('time_to_first_diagnosis_minutes'))}}" } },
+    { "name": "average_time_to_approval_minutes", "module": "core", "action": "setvalue", "output": true, "options": { "key": "average_time_to_approval_minutes", "value": "{{metrics.avg('time_to_approval_minutes') == null ? null : floor(metrics.avg('time_to_approval_minutes'))}}" } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "summary": { "total_tickets": "{{total_tickets}}", "open_total": "{{open_total}}", "terminal_total": "{{terminal_total}}", "submitted": "{{submitted}}", "needs_clarification": "{{needs_clarification}}", "approved_for_pickup": "{{approved_for_pickup}}", "assigned_open": "{{assigned_open}}", "unassigned_open": "{{unassigned_open}}", "average_open_age_minutes": "{{average_open_age_minutes}}", "average_time_to_first_diagnosis_minutes": "{{average_time_to_first_diagnosis_minutes}}", "average_time_to_approval_minutes": "{{average_time_to_approval_minutes}}" }, "metrics": "{{metrics}}", "status_breakdown": "{{status_breakdown}}", "district_breakdown": "{{district_breakdown}}", "school_breakdown": "{{school_breakdown}}", "requester_breakdown": "{{requester_breakdown}}", "workload": "{{workload}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Ticket dashboard could not be loaded." } } }] }
+}

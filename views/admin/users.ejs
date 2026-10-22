@@ -1,0 +1,113 @@
+<!-- Wappler include head-page="layouts/main" bootstrap5="local" is="dmx-app" appConnect="local" components="{dmxBootstrap5Modal:{}}" -->
+<meta name="ac:route" content="/admin/users">
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="userList" url="/api/admin/users/list"></dmx-serverconnect>
+  <dmx-serverconnect id="formOptions" url="/api/admin/users/form-options"></dmx-serverconnect>
+  <%- await include("../partials/portal-sidebar", { currentPage: "users" }) %>
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "User Administration" }) %>
+    <main class="portal-main user-admin-page" aria-label="User Administration">
+      <div class="user-admin-breadcrumb" aria-label="Breadcrumb">
+        <i class="fas fa-home" aria-hidden="true"></i>
+        <a href="/">Home</a>
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+        <span>Administration</span>
+        <i class="fas fa-chevron-right" aria-hidden="true"></i>
+        <strong aria-current="page">Users</strong>
+      </div>
+
+      <header class="user-admin-heading">
+        <div>
+          <h1>User Administration</h1>
+          <p>Create and manage portal users, security groups and access scope.</p>
+        </div>
+        <a href="/admin/users/new" class="btn btn-bmobile-primary user-add-button" dmx-show="authContext.data.can_users_create">
+          <i class="fas fa-plus" aria-hidden="true"></i><span>Add User</span>
+        </a>
+      </header>
+
+      <section class="user-summary-grid" aria-label="User administration summary">
+        <article class="user-summary-card">
+          <span class="user-summary-icon user-summary-icon-green"><i class="fas fa-users" aria-hidden="true"></i></span>
+          <div class="user-summary-copy"><span>Total Users</span><strong dmx-text="userList.data.total_users || 0">0</strong><small>Portal users registered</small></div>
+          <i class="fas fa-chevron-right user-summary-chevron" aria-hidden="true"></i>
+        </article>
+        <article class="user-summary-card">
+          <span class="user-summary-icon user-summary-icon-green"><i class="fas fa-user" aria-hidden="true"></i></span>
+          <div class="user-summary-copy"><span>Active Users</span><strong dmx-text="userList.data.active_users || 0">0</strong><small><i class="fas fa-arrow-up" aria-hidden="true"></i> Active accounts</small></div>
+          <i class="fas fa-chevron-right user-summary-chevron" aria-hidden="true"></i>
+        </article>
+        <article class="user-summary-card">
+          <span class="user-summary-icon user-summary-icon-purple"><i class="fas fa-user-friends" aria-hidden="true"></i></span>
+          <div class="user-summary-copy"><span>Security Groups</span><strong dmx-text="userList.data.security_groups || 0">0</strong><small>Access groups configured</small></div>
+          <i class="fas fa-chevron-right user-summary-chevron" aria-hidden="true"></i>
+        </article>
+        <article class="user-summary-card">
+          <span class="user-summary-icon user-summary-icon-blue"><i class="fas fa-globe" aria-hidden="true"></i></span>
+          <div class="user-summary-copy"><span>Global Scope Users</span><strong dmx-text="userList.data.global_users || 0">0</strong><small>Users with global access</small></div>
+          <i class="fas fa-chevron-right user-summary-chevron" aria-hidden="true"></i>
+        </article>
+      </section>
+
+      <section class="user-filter-card" aria-labelledby="userFilterHeading">
+        <div class="user-filter-heading">
+          <div class="user-filter-title">
+            <i class="fas fa-filter" aria-hidden="true"></i>
+            <div><h2 id="userFilterHeading">Search and Filter Users</h2><p>Find users by name, email, security group, status or district.</p></div>
+          </div>
+          <button class="btn btn-bmobile-secondary user-clear-filters" type="button" dmx-on:click="userFilters.reset();userList.load({search:'',role:'',status:'',district_id:'',page:1},true)">
+            <i class="fas fa-redo-alt" aria-hidden="true"></i><span>Clear Filters</span>
+          </button>
+        </div>
+        <form id="userFilters" class="user-filter-grid" aria-label="Filter users" dmx-on:submit.prevent="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:1},true)">
+          <div class="user-search-field">
+            <label for="searchUsers" class="form-label">Search users</label>
+            <div class="user-input-with-icon"><i class="fas fa-search" aria-hidden="true"></i><input id="searchUsers" class="form-control" type="search" placeholder="Name, username or email" autocomplete="off" dmx-on:input.debounce:300="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:1},true)"></div>
+          </div>
+          <div>
+            <label for="groupFilter" class="form-label">Security Group</label>
+            <select id="groupFilter" class="form-select" dmx-on:change="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:1},true)"><option value="">All groups</option><option dmx-repeat:groups="formOptions.data.roles" dmx-bind:value="name" dmx-text="label"></option></select>
+          </div>
+          <div>
+            <label for="statusFilter" class="form-label">Status</label>
+            <select id="statusFilter" class="form-select" dmx-on:change="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:1},true)"><option value="">All statuses</option><option value="active">Active</option><option value="disabled">Inactive</option><option value="locked">Locked</option></select>
+          </div>
+          <div>
+            <label for="districtFilter" class="form-label">District</label>
+            <select id="districtFilter" class="form-select" dmx-on:change="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:1},true)"><option value="">All districts</option><option dmx-repeat:districts="formOptions.data.districts" dmx-bind:value="id" dmx-text="name"></option></select>
+          </div>
+        </form>
+      </section>
+
+      <section class="user-list-card" aria-labelledby="userListHeading">
+        <div class="user-list-heading">
+          <h2 id="userListHeading"><i class="fas fa-user-friends" aria-hidden="true"></i><span dmx-text="'Users (' + (userList.data.total || 0) + ')'">Users (0)</span></h2>
+          <div class="user-list-paging"><span dmx-text="'Showing page ' + (userList.data.page || 1) + ' · ' + (userList.data.total || 0) + ' users'">Showing users</span>
+            <button class="btn btn-bmobile-secondary user-page-button" type="button" aria-label="Previous page" dmx-bind:disabled="userList.data.page <= 1 || userList.state.executing" dmx-on:click="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:userList.data.page - 1},true)"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+            <button class="btn btn-bmobile-secondary user-page-button" type="button" aria-label="Next page" dmx-bind:disabled="userList.data.page * 25 >= userList.data.total || userList.state.executing" dmx-on:click="userList.load({search:searchUsers.value,role:groupFilter.value,status:statusFilter.value,district_id:districtFilter.value,page:userList.data.page + 1},true)"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+          </div>
+        </div>
+        <p class="user-loading-message" role="status" dmx-show="userList.state.executing"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> Loading users…</p>
+        <div class="alert alert-danger" role="alert" dmx-show="userList.lastError.status">Users could not be loaded. Please try again.</div>
+        <div class="table-responsive user-table-scroll">
+          <table class="table portal-table user-admin-table align-middle">
+            <thead><tr><th scope="col">User</th><th scope="col">Email</th><th scope="col">Security Groups</th><th scope="col">Scope</th><th scope="col">Status</th><th scope="col">Last login / Created</th><th scope="col" class="text-end">Actions</th></tr></thead>
+            <tbody is="dmx-repeat" dmx-bind:repeat="userList.data.users">
+              <tr>
+                <td data-label="User"><div class="user-identity-cell"><span class="user-row-avatar" aria-hidden="true" dmx-text="display_name.substring(0,1).uppercase()">U</span><span><strong dmx-text="display_name"></strong><small dmx-text="username"></small></span></div></td>
+                <td class="user-email-cell" data-label="Email" dmx-text="email"></td>
+                <td data-label="Security Groups" dmx-text="security_groups"></td>
+                <td class="user-scope-cell" data-label="Scope" dmx-text="scope_summary"></td>
+                <td data-label="Status"><span class="user-status-pill" dmx-class:is-active="status == 'active'" dmx-class:is-locked="status == 'locked'" dmx-text="status == 'disabled' ? 'Inactive' : status.uppercase()">Status</span></td>
+                <td class="user-date-cell" data-label="Last login / Created" dmx-attr:title="(last_login_at || 'Never signed in') + ' / Created ' + created_at"><span dmx-text="last_login_at ? last_login_at.formatDate('MMM d, yyyy') : 'Never signed in'"></span><small dmx-text="'Created ' + created_at.formatDate('MMM d, yyyy')"></small></td>
+                <td class="text-end" data-label="Actions"><div class="dropdown user-row-actions"><a class="btn btn-bmobile-secondary btn-sm" dmx-bind:href="'/admin/users/detail?user_id=' + id">View</a><button class="btn user-more-button" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false" aria-label="More actions"><i class="fas fa-ellipsis-v" aria-hidden="true"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" dmx-bind:href="'/admin/users/detail?user_id=' + id">View user</a></li><li dmx-show="authContext.data.can_users_update"><a class="dropdown-item" dmx-bind:href="'/admin/users/edit?user_id=' + id">Edit user</a></li></ul></div></td>
+              </tr>
+            </tbody>
+            <tbody dmx-show="!userList.state.executing && userList.data.total == 0"><tr><td colspan="7" class="user-empty-state"><i class="fas fa-user-slash" aria-hidden="true"></i><strong>No users found</strong><span>No users match these filters. Try changing your search criteria.</span></td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>

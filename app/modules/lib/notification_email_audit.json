@@ -1,0 +1,8 @@
+{
+  "exec": {
+    "steps": [
+      { "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{$_PARAM.actor_user_id || null}}" }, { "column": "action", "value": "{{$_PARAM.action}}" }, { "column": "module", "value": "notifications" }, { "column": "entity_type", "value": "notification_email_delivery" }, { "column": "entity_id", "value": "{{$_PARAM.delivery_id}}" }, { "column": "description", "value": "{{$_PARAM.description}}" }] } } }
+    ],
+    "catch": [{ "module": "core", "action": "setvalue", "output": true, "options": { "key": "email_audit_unavailable", "value": true } }]
+  }
+}

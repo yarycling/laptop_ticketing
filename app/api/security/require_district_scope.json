@@ -1,0 +1,49 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "district_id"
+      }
+    ],
+    "$_GET": [
+      {
+        "type": "number",
+        "name": "district_id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_scope",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_district_scope",
+          "params": {
+            "district_id": "{{$_POST.district_id ? $_POST.district_id : $_GET.district_id}}"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "scope": "{{require_scope.scope}}"
+          }
+        }
+      }
+    ]
+  }
+}

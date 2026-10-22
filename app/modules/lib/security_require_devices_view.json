@@ -1,0 +1,17 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.view"
+          }
+        }
+      }
+    ]
+  }
+}

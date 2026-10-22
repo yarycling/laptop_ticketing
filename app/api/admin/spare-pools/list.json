@@ -1,0 +1,730 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "spare_pools.view"
+          }
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "name": "pools",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "spare_pools",
+              "alias": "p"
+            },
+            "columns": [
+              {
+                "table": "p",
+                "column": "id"
+              },
+              {
+                "table": "p",
+                "column": "pool_code"
+              },
+              {
+                "table": "p",
+                "column": "name"
+              },
+              {
+                "table": "p",
+                "column": "service_location_id"
+              },
+              {
+                "table": "p",
+                "column": "status"
+              },
+              {
+                "table": "p",
+                "column": "is_default"
+              },
+              {
+                "table": "p",
+                "column": "created_at"
+              },
+              {
+                "table": "loc",
+                "column": "code",
+                "alias": "location_code"
+              },
+              {
+                "table": "loc",
+                "column": "name",
+                "alias": "location_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "service_locations",
+                "alias": "loc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "loc",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "p",
+                        "column": "service_location_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "orders": [
+              {
+                "table": "loc",
+                "column": "name",
+                "direction": "asc"
+              },
+              {
+                "table": "p",
+                "column": "name",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "pool_code"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.location_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "service_location_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.location_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.default_status == '0' || $_GET.default_status == '1'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "is_default"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.default_status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "active_pool_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "spare_pools",
+              "alias": "p"
+            },
+            "columns": [
+              {
+                "table": "p",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "service_locations",
+                "alias": "loc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "loc",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "p",
+                        "column": "service_location_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "p",
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "pool_code"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.location_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "service_location_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.location_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.default_status == '0' || $_GET.default_status == '1'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "p",
+                        "column": "is_default"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.default_status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "locations",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "service_locations",
+              "alias": "loc"
+            },
+            "columns": [
+              {
+                "table": "loc",
+                "column": "id"
+              },
+              {
+                "table": "loc",
+                "column": "code"
+              },
+              {
+                "table": "loc",
+                "column": "name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "loc",
+                    "column": "location_type"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                },
+                {
+                  "data": {
+                    "table": "loc",
+                    "column": "is_active"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "loc",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "loc",
+                            "column": "id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "loc",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "default_pools",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "spare_pools",
+              "alias": "p"
+            },
+            "columns": [
+              {
+                "table": "p",
+                "column": "service_location_id"
+              },
+              {
+                "table": "p",
+                "column": "id",
+                "alias": "default_pool_id"
+              },
+              {
+                "table": "p",
+                "column": "name",
+                "alias": "pool_name"
+              },
+              {
+                "table": "p",
+                "column": "pool_code"
+              },
+              {
+                "table": "loc",
+                "column": "name",
+                "alias": "location_name"
+              },
+              {
+                "table": "loc",
+                "column": "code",
+                "alias": "location_code"
+              }
+            ],
+            "joins": [
+              {
+                "table": "service_locations",
+                "alias": "loc",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "loc",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "p",
+                        "column": "service_location_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "p",
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "data": {
+                    "table": "p",
+                    "column": "is_default"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "table": "p",
+                    "column": "active_default_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "table": "loc",
+                    "column": "location_type"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                },
+                {
+                  "data": {
+                    "table": "loc",
+                    "column": "is_active"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "p",
+                            "column": "service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "filter_locations",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "code"
+              },
+              {
+                "column": "name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "location_type"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "pools": "{{pools}}",
+            "active_pool_count": "{{active_pool_count}}",
+            "locations": "{{locations}}",
+            "filter_locations": "{{filter_locations}}",
+            "default_pools": "{{default_pools}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Spare pools could not be loaded."
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "location_id",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      },
+      {
+        "name": "default_status",
+        "type": "text"
+      }
+    ]
+  }
+}

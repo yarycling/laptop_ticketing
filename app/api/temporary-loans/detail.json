@@ -1,0 +1,897 @@
+{
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid temporary loan ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_temporary_loan_queue",
+              "alias": "q"
+            },
+            "columns": [
+              {
+                "table": "q",
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "table": "q",
+                "column": "loan_number"
+              },
+              {
+                "table": "q",
+                "column": "ticket_id"
+              },
+              {
+                "table": "q",
+                "column": "ticket_number"
+              },
+              {
+                "table": "q",
+                "column": "original_device_id"
+              },
+              {
+                "table": "q",
+                "column": "original_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "original_asset_tag"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_id"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_name"
+              },
+              {
+                "table": "q",
+                "column": "origin_school_id"
+              },
+              {
+                "table": "q",
+                "column": "origin_school_name"
+              },
+              {
+                "table": "q",
+                "column": "repair_job_id"
+              },
+              {
+                "table": "q",
+                "column": "repair_service_location_id"
+              },
+              {
+                "table": "q",
+                "column": "repair_centre_name"
+              },
+              {
+                "table": "q",
+                "column": "spare_pool_id"
+              },
+              {
+                "table": "q",
+                "column": "pool_code"
+              },
+              {
+                "table": "q",
+                "column": "spare_pool_name"
+              },
+              {
+                "table": "q",
+                "column": "current_status_code"
+              },
+              {
+                "table": "q",
+                "column": "loan_status_name"
+              },
+              {
+                "table": "q",
+                "column": "request_reason_code"
+              },
+              {
+                "table": "q",
+                "column": "requested_by"
+              },
+              {
+                "table": "q",
+                "column": "requested_at"
+              },
+              {
+                "table": "q",
+                "column": "request_notes"
+              },
+              {
+                "table": "q",
+                "column": "authorized_by"
+              },
+              {
+                "table": "q",
+                "column": "authorized_at"
+              },
+              {
+                "table": "q",
+                "column": "authorization_notes"
+              },
+              {
+                "table": "q",
+                "column": "rejected_by"
+              },
+              {
+                "table": "q",
+                "column": "rejected_at"
+              },
+              {
+                "table": "q",
+                "column": "rejection_reason"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_device_id"
+              },
+              {
+                "table": "q",
+                "column": "selected_by"
+              },
+              {
+                "table": "q",
+                "column": "selected_at"
+              },
+              {
+                "table": "q",
+                "column": "issued_by"
+              },
+              {
+                "table": "q",
+                "column": "issued_at"
+              },
+              {
+                "table": "q",
+                "column": "return_requested_by"
+              },
+              {
+                "table": "q",
+                "column": "return_requested_at"
+              },
+              {
+                "table": "q",
+                "column": "return_reason_code"
+              },
+              {
+                "table": "q",
+                "column": "return_reason_name"
+              },
+              {
+                "table": "q",
+                "column": "return_notes"
+              },
+              {
+                "table": "q",
+                "column": "return_condition_code"
+              },
+              {
+                "table": "q",
+                "column": "returned_by"
+              },
+              {
+                "table": "q",
+                "column": "returned_at"
+              },
+              {
+                "table": "q",
+                "column": "conversion_status"
+              },
+              {
+                "table": "q",
+                "column": "conversion_request_id"
+              },
+              {
+                "table": "q",
+                "column": "latest_conversion_request_id"
+              },
+              {
+                "table": "q",
+                "column": "conversion_request_number"
+              },
+              {
+                "table": "q",
+                "column": "conversion_request_status"
+              },
+              {
+                "table": "q",
+                "column": "conversion_reason_code"
+              },
+              {
+                "table": "q",
+                "column": "conversion_reason_name"
+              },
+              {
+                "table": "q",
+                "column": "conversion_request_notes"
+              },
+              {
+                "table": "q",
+                "column": "conversion_requested_by"
+              },
+              {
+                "table": "q",
+                "column": "conversion_requested_by_name"
+              },
+              {
+                "table": "q",
+                "column": "conversion_requested_at"
+              },
+              {
+                "table": "q",
+                "column": "conversion_decision"
+              },
+              {
+                "table": "q",
+                "column": "conversion_decided_by"
+              },
+              {
+                "table": "q",
+                "column": "conversion_decided_by_name"
+              },
+              {
+                "table": "q",
+                "column": "conversion_decided_at"
+              },
+              {
+                "table": "q",
+                "column": "conversion_decision_notes"
+              },
+              {
+                "table": "q",
+                "column": "permanent_replacement_case_id"
+              },
+              {
+                "table": "q",
+                "column": "permanent_replacement_number"
+              },
+              {
+                "table": "q",
+                "column": "permanent_replacement_status"
+              },
+              {
+                "table": "q",
+                "column": "original_device_lifecycle_code"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_stock_location_id"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_asset_tag"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_manufacturer_name"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_model_name"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_lifecycle_code"
+              },
+              {
+                "table": "q",
+                "column": "selected_spare_stock_status"
+              },
+              {
+                "table": "q",
+                "column": "spare_reservation_status"
+              },
+              {
+                "table": "q",
+                "column": "spare_reservation_active"
+              },
+              {
+                "table": "q",
+                "column": "physical_custody_code"
+              },
+              {
+                "table": "q",
+                "column": "custody_recorded_at"
+              },
+              {
+                "table": "q",
+                "column": "active_record_key"
+              },
+              {
+                "table": "q",
+                "column": "created_at"
+              },
+              {
+                "table": "q",
+                "column": "updated_at"
+              },
+              {
+                "table": "q",
+                "column": "closed_at"
+              },
+              {
+                "table": "q",
+                "column": "ticket_status_code"
+              },
+              {
+                "table": "q",
+                "column": "logistics_status_code"
+              },
+              {
+                "table": "q",
+                "column": "repair_completed_at"
+              },
+              {
+                "table": "q",
+                "column": "manufacturer_return_status_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "q",
+                    "column": "temporary_loan_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                },
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "temporary_loan_case_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "origin_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "repair_service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!case.temporary_loan_case_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "replacement_conflict",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "permanent_replacement_cases",
+              "alias": "prc"
+            },
+            "columns": [
+              {
+                "table": "prc",
+                "column": "id"
+              },
+              {
+                "table": "prc",
+                "column": "replacement_number"
+              },
+              {
+                "table": "prc",
+                "column": "current_status_code"
+              },
+              {
+                "table": "prc",
+                "column": "exception_case_id"
+              },
+              {
+                "table": "prc",
+                "column": "ticket_id"
+              },
+              {
+                "table": "prc",
+                "column": "replacement_source_type"
+              },
+              {
+                "table": "prc",
+                "column": "active_selection_key"
+              },
+              {
+                "table": "ec",
+                "column": "current_status_code",
+                "alias": "exception_status_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "prc",
+                    "column": "original_device_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.original_device_id}}"
+                },
+                {
+                  "data": {
+                    "table": "prc",
+                    "column": "active_record_key"
+                  },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            },
+            "joins": [
+              {
+                "table": "repair_exception_cases",
+                "alias": "ec",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ec",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "prc",
+                        "column": "exception_case_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "temporary_loan_status_history",
+              "alias": "h"
+            },
+            "columns": [
+              {
+                "table": "h",
+                "column": "from_status_code"
+              },
+              {
+                "table": "h",
+                "column": "to_status_code"
+              },
+              {
+                "table": "h",
+                "column": "notes"
+              },
+              {
+                "table": "h",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "h",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "h",
+                    "column": "temporary_loan_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.temporary_loan_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "h",
+                "column": "created_at",
+                "direction": "desc"
+              },
+              {
+                "table": "h",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "decision",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "temporary_loan_decisions",
+              "alias": "d"
+            },
+            "columns": [
+              {
+                "table": "d",
+                "column": "decision_code"
+              },
+              {
+                "table": "d",
+                "column": "notes"
+              },
+              {
+                "table": "d",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "d",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "d",
+                    "column": "temporary_loan_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.temporary_loan_case_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "custody_history",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "temporary_loan_custody_history",
+              "alias": "c"
+            },
+            "columns": [
+              {
+                "table": "c",
+                "column": "device_id"
+              },
+              {
+                "table": "c",
+                "column": "from_custody_code"
+              },
+              {
+                "table": "c",
+                "column": "to_custody_code"
+              },
+              {
+                "table": "c",
+                "column": "notes"
+              },
+              {
+                "table": "c",
+                "column": "created_at"
+              },
+              {
+                "table": "u",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "u",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "u",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "c",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "c",
+                    "column": "temporary_loan_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{case.temporary_loan_case_id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "c",
+                "column": "created_at",
+                "direction": "desc"
+              },
+              {
+                "table": "c",
+                "column": "id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_custody_history",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{custody_history}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "recorded_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "recorded_at_display",
+                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_history",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{history}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "recorded_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "recorded_at_display",
+                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "case": "{{case}}",
+            "history": "{{display_history}}",
+            "decision": "{{decision}}",
+            "custody_history": "{{display_custody_history}}",
+            "replacement_conflict": "{{replacement_conflict}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Temporary loan detail could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

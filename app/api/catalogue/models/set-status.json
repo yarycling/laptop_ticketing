@@ -1,0 +1,326 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "id",
+        "type": "number"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.id || $_POST.id < 1 || ($_POST.status != 'active' && $_POST.status != 'inactive')}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Valid ID and status are required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "model",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "device_models",
+              "alias": "m"
+            },
+            "columns": [
+              {
+                "table": "m",
+                "column": "id",
+                "alias": "id"
+              },
+              {
+                "table": "m",
+                "column": "status",
+                "alias": "status"
+              },
+              {
+                "table": "mf",
+                "column": "status",
+                "alias": "manufacturer_status"
+              }
+            ],
+            "joins": [
+              {
+                "table": "manufacturers",
+                "alias": "mf",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "mf",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "m",
+                        "column": "manufacturer_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "m",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!model.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Model was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{model.status == $_POST.status}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "unchanged": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_POST.status == 'active' && model.manufacturer_status != 'active'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "Activate the manufacturer before reactivating this model."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "change_model_status",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "update_model",
+                "module": "dbupdater",
+                "action": "update",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "device_models",
+                    "values": [
+                      {
+                        "column": "status",
+                        "value": "{{$_POST.status}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "audit_model_status",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "{{$_POST.status == 'active' ? 'model_activated' : 'model_deactivated'}}"
+                      },
+                      {
+                        "column": "module",
+                        "value": "device_catalogue"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "device_model"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{$_POST.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Device model status changed."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

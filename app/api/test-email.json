@@ -1,0 +1,19 @@
+{
+  "name": "",
+  "module": "mail",
+  "action": "send",
+  "options": {
+    "instance": "mail",
+    "subject": "TSTT Laptop Portal email test",
+    "fromName": "TSTT Laptop Portal",
+    "fromEmail": "no+reply@tstt.co.tt",
+    "replyTo": "no+reply@tstt.co.tt",
+    "toName": "James",
+    "toEmail": "jrthomas@tstt.co.tt",
+    "body": "This test confirms that the portal can send email using the configured mail service.",
+    "source": "file",
+    "contentType": "html",
+    "bodyFile": "/app/emails/test.html",
+    "embedImages": false
+  }
+}

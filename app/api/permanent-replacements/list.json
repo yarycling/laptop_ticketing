@@ -1,0 +1,376 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "status",
+        "type": "text"
+      },
+      {
+        "name": "district_id",
+        "type": "number"
+      },
+      {
+        "name": "repair_centre_id",
+        "type": "number"
+      },
+      {
+        "name": "search",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "replacements.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.service_locations.length == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "cases",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_permanent_replacement_queue",
+              "alias": "q"
+            },
+            "columns": [
+              {
+                "table": "q",
+                "column": "replacement_case_id"
+              },
+              {
+                "table": "q",
+                "column": "replacement_number"
+              },
+              {
+                "table": "q",
+                "column": "exception_case_id"
+              },
+              {
+                "table": "q",
+                "column": "ticket_id"
+              },
+              {
+                "table": "q",
+                "column": "ticket_number"
+              },
+              {
+                "table": "q",
+                "column": "original_device_id"
+              },
+              {
+                "table": "q",
+                "column": "original_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "original_asset_tag"
+              },
+              {
+                "table": "q",
+                "column": "replacement_source_type"
+              },
+              {
+                "table": "q",
+                "column": "replacement_device_id"
+              },
+              {
+                "table": "q",
+                "column": "replacement_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "replacement_asset_tag"
+              },
+              {
+                "table": "q",
+                "column": "staged_serial_number"
+              },
+              {
+                "table": "q",
+                "column": "repair_service_location_id"
+              },
+              {
+                "table": "q",
+                "column": "repair_centre_name"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_id"
+              },
+              {
+                "table": "q",
+                "column": "origin_district_name"
+              },
+              {
+                "table": "q",
+                "column": "replacement_status_code"
+              },
+              {
+                "table": "q",
+                "column": "replacement_status_name"
+              },
+              {
+                "table": "q",
+                "column": "updated_at"
+              },
+              {
+                "table": "q",
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "table": "q",
+                "column": "loan_number"
+              },
+              {
+                "table": "q",
+                "column": "conversion_request_number"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "replacement_case_id"
+                          },
+                          "operation": ">",
+                          "value": 0
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "origin_district_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.districts.flatten('id')}}"
+                        }
+                      ]
+                    },
+                    {
+                      "condition": "AND",
+                      "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "q",
+                            "column": "repair_service_location_id"
+                          },
+                          "operation": "in",
+                          "value": "{{scope_context.service_locations.flatten('id')}}"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.status && $_GET.status != 'ALL'}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "replacement_status_code"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.district_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "origin_district_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.district_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "AND",
+                  "conditional": "{{$_GET.repair_centre_id}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "repair_service_location_id"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.repair_centre_id}}"
+                    }
+                  ]
+                },
+                {
+                  "condition": "OR",
+                  "conditional": "{{$_GET.search}}",
+                  "rules": [
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "ticket_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "replacement_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "table": "q",
+                        "column": "original_serial_number"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ]
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "q",
+                "column": "updated_at",
+                "direction": "desc"
+              },
+              {
+                "table": "q",
+                "column": "replacement_case_id",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_cases",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{cases}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "updated_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "updated_at_display",
+                  "value": "{{updated_at ? updated_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "cases": "{{display_cases}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Permanent replacements could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

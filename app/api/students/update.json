@@ -1,0 +1,447 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "id"
+      },
+      {
+        "type": "number",
+        "name": "school_id"
+      },
+      {
+        "type": "text",
+        "name": "first_name"
+      },
+      {
+        "type": "text",
+        "name": "last_name"
+      },
+      {
+        "type": "text",
+        "name": "school_student_id_number"
+      },
+      {
+        "type": "text",
+        "name": "school_start_date"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "students.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.id || $_POST.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Student ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "current_student",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "students",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "school_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!current_student.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Student was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_access",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_authorized_schools",
+          "params": {
+            "super_admin": "{{require_permission.bypass == 'SUPER_ADMIN'}}"
+          }
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school_access.allowed_schools.flatten('id').contains(current_student.school_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "first_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "first_name",
+          "value": "{{($_POST.first_name || '').trim()}}"
+        }
+      },
+      {
+        "name": "last_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "last_name",
+          "value": "{{($_POST.last_name || '').trim()}}"
+        }
+      },
+      {
+        "name": "school_student_id_number",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_student_id_number",
+          "value": "{{($_POST.school_student_id_number || '').trim()}}"
+        }
+      },
+      {
+        "name": "school_start_date",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_start_date",
+          "value": "{{($_POST.school_start_date || '').trim()}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.school_id || $_POST.school_id < 1 || !first_name || !last_name || first_name.length() > 100 || last_name.length() > 100 || school_student_id_number.length() > 100}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "School, first name, and last name are required within their length limits."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "target_school",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "schools",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.school_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!target_school.id || target_school.status != 'active'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Select an active school."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school_access.allowed_schools.flatten('id').contains(target_school.id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "save_student",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "update_student",
+                "module": "dbupdater",
+                "action": "update",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "students",
+                    "values": [
+                      {
+                        "column": "school_id",
+                        "value": "{{$_POST.school_id}}"
+                      },
+                      {
+                        "column": "first_name",
+                        "value": "{{first_name}}"
+                      },
+                      {
+                        "column": "last_name",
+                        "value": "{{last_name}}"
+                      },
+                      {
+                        "column": "updated_by_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "school_student_id_number",
+                        "value": "{{school_student_id_number || null}}"
+                      },
+                      {
+                        "column": "school_start_date",
+                        "value": "{{school_start_date || null}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "audit_student_updated",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "student_updated"
+                      },
+                      {
+                        "column": "module",
+                        "value": "students"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "student"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{$_POST.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Student updated."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "condition",
+          "options": {
+            "if": "{{$_EXCEPTION.code == 'ER_DUP_ENTRY' || ($_ERROR && $_ERROR.contains('Duplicate entry'))}}",
+            "then": {
+              "steps": [
+                {
+                  "module": "core",
+                  "action": "response",
+                  "options": {
+                    "status": 409,
+                    "data": {
+                      "success": false,
+                      "error": "A record with these identifiers already exists."
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

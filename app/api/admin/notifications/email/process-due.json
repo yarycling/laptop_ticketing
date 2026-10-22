@@ -1,0 +1,9 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.manage" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "process", "module": "core", "action": "exec", "output": true, "options": { "exec": "notification_email_process_due", "params": { "actor_user_id": "{{identity}}" } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "processed_count": "{{process.processed_count || 0}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Due email deliveries could not be processed." } } }] }
+}

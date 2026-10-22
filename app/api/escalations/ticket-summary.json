@@ -1,0 +1,16 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "ticket_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "escalations.view" } } },
+    { "name": "scope_context", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_get_scope_context", "params": {} } },
+    { "name": "ttpost_role", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "user_roles", "alias": "ur" }, "columns": [{ "table": "r", "column": "name", "alias": "role_name" }], "joins": [{ "table": "roles", "alias": "r", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "r", "column": "id", "operation": "=", "value": { "table": "ur", "column": "role_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "ur", "column": "user_id" }, "operation": "=", "value": "{{identity}}" }, { "data": { "table": "r", "column": "name" }, "operation": "=", "value": "TTPOST_LOGISTICS" }] } } } },
+    { "name": "rows", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "v_escalation_operational_queue", "columns": [{ "column": "escalation_case_id" }, { "column": "escalation_number" }, { "column": "current_state_code" }, { "column": "current_state_name" }, { "column": "current_level" }, { "column": "current_trigger" }, { "column": "policy_code_snapshot" }, { "column": "opened_at" }, { "column": "sla_due_at" }, { "column": "sla_state_code" }, { "column": "responsible_roles" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "ticket_id" }, "operation": "=", "value": "{{$_GET.ticket_id}}" }, { "condition": "OR", "rules": [
+      { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope || ttpost_role.role_name == 'TTPOST_LOGISTICS'}}", "rules": [{ "data": { "column": "escalation_case_id" }, "operation": ">", "value": 0 }] },
+      { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "column": "district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+      { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.schools.length > 0}}", "rules": [{ "data": { "column": "school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] },
+      { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && scope_context.service_locations.length > 0}}", "rules": [{ "data": { "column": "repair_centre_location_id" }, "operation": "in", "value": "{{scope_context.service_locations.flatten('id')}}" }] }
+    ] }] }, "orders": [{ "column": "opened_at", "direction": "desc" }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "escalations": "{{rows}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Ticket escalations could not be loaded." } } }] }
+}

@@ -1,0 +1,85 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "users.disable"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "user_admin_mutate",
+          "params": {
+            "mode": "reactivate"
+          }
+        },
+        "name": "result"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "user_id": "{{result.user_id}}",
+            "message": "User updated.",
+            "email_sent": null
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "user_id",
+        "type": "text"
+      }
+    ]
+  }
+}

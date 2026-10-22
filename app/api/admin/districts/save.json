@@ -1,0 +1,352 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "id"
+      },
+      {
+        "type": "text",
+        "name": "name"
+      },
+      {
+        "type": "text",
+        "name": "status"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "districts.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "district_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "district_name",
+          "value": "{{$_POST.name.trim()}}"
+        }
+      },
+      {
+        "name": "district_status",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "district_status",
+          "value": "{{$_POST.status == 'inactive' ? 'inactive' : 'active'}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!district_name}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "District name is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "duplicate",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "districts",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "{{district_name}}"
+                },
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "!=",
+                  "value": "{{$_POST.id ? $_POST.id : 0}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{duplicate.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "District name already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "save_district_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{$_POST.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "update_district",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "districts",
+                            "values": [
+                              {
+                                "column": "name",
+                                "value": "{{district_name}}"
+                              },
+                              {
+                                "column": "status",
+                                "value": "{{district_status}}"
+                              },
+                              {
+                                "column": "updated_at",
+                                "value": "{{NOW}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{$_POST.id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_district_updated",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "district.updated"
+                              },
+                              {
+                                "column": "module",
+                                "value": "organisation"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "district"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{$_POST.id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "District updated."
+                              },
+                              {
+                                "column": "created_at",
+                                "value": "{{NOW}}"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!$_POST.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "create_district",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "districts",
+                            "values": [
+                              {
+                                "column": "name",
+                                "value": "{{district_name}}"
+                              },
+                              {
+                                "column": "status",
+                                "value": "{{district_status}}"
+                              },
+                              {
+                                "column": "created_at",
+                                "value": "{{NOW}}"
+                              },
+                              {
+                                "column": "updated_at",
+                                "value": "{{NOW}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "audit_district_created",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "district.created"
+                              },
+                              {
+                                "column": "module",
+                                "value": "organisation"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "district"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{create_district.identity}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "District created."
+                              },
+                              {
+                                "column": "created_at",
+                                "value": "{{NOW}}"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "District could not be saved."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

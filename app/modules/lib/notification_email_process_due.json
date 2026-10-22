@@ -1,0 +1,10 @@
+{
+  "exec": {
+    "steps": [
+      { "name": "due_deliveries", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "notification_deliveries", "columns": [{ "column": "id" }, { "column": "status_code" }], "wheres": { "condition": "AND", "rules": [{ "condition": "OR", "rules": [{ "data": { "column": "status_code" }, "operation": "=", "value": "PENDING" }, { "condition": "AND", "rules": [{ "data": { "column": "status_code" }, "operation": "=", "value": "RETRY_PENDING" }, { "data": { "column": "next_attempt_at" }, "operation": "<=", "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}" }] }] }] }, "orders": [{ "column": "id", "direction": "asc" }], "limit": 10 } } },
+      { "name": "process_each", "module": "core", "action": "repeat", "output": true, "options": { "repeat": "{{due_deliveries}}", "outputFilter": "exclude", "outputFields": [], "exec": { "steps": [{ "module": "core", "action": "exec", "options": { "exec": "notification_email_send", "params": { "delivery_id": "{{id}}", "actor_user_id": "{{$_PARAM.actor_user_id || null}}" } } }] } } },
+      { "name": "processed_count", "module": "core", "action": "setvalue", "output": true, "options": { "key": "processed_count", "value": "{{due_deliveries.length}}" } }
+    ],
+    "catch": [{ "module": "core", "action": "setvalue", "output": true, "options": { "key": "process_due_failed", "value": true } }]
+  }
+}

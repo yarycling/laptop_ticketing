@@ -1,0 +1,238 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "devices.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{require_permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "summary": {
+                      "total": 0,
+                      "received": 0,
+                      "available": 0,
+                      "warranty_expired": 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "summary_total_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "devices"
+          }
+        }
+      },
+      {
+        "name": "summary_received_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "devices",
+              "alias": "dv"
+            },
+            "columns": [
+              {
+                "table": "dv",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "device_lifecycle_statuses",
+                "alias": "ls",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ls",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "lifecycle_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ls",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "RECEIVED"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "summary_available_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "devices",
+              "alias": "dv"
+            },
+            "columns": [
+              {
+                "table": "dv",
+                "column": "id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "device_lifecycle_statuses",
+                "alias": "ls",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "ls",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "dv",
+                        "column": "lifecycle_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ls",
+                    "column": "code"
+                  },
+                  "operation": "=",
+                  "value": "AVAILABLE"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "summary_warranty_expired_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "devices",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "warranty_end_date"
+                  },
+                  "operation": "<",
+                  "value": "{{'now'.formatDate('yyyy-MM-dd')}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "summary": {
+              "total": "{{summary_total_count}}",
+              "received": "{{summary_received_count}}",
+              "available": "{{summary_available_count}}",
+              "warranty_expired": "{{summary_warranty_expired_count}}"
+            }
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "name": "auth_version_identity",
+        "module": "auth",
+        "action": "identify",
+        "options": { "provider": "portalSecurity" }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{auth_version_identity}}",
+          "then": {
+            "steps": [
+              {
+                "name": "auth_version_user",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "users",
+                    "columns": [
+                      { "column": "id" },
+                      { "column": "status" },
+                      { "column": "auth_version" }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        { "data": { "column": "id" }, "operation": "=", "value": "{{auth_version_identity}}" }
+                      ]
+                    }
+                  }
+                },
+                "outputType": "object"
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!auth_version_user.id || auth_version_user.status != 'active' || !$_SESSION.portalSecurityAuthVersion || $_SESSION.portalSecurityAuthVersion != auth_version_user.auth_version}}",
+                  "then": {
+                    "steps": [
+                      { "module": "auth", "action": "logout", "options": { "provider": "portalSecurity" } },
+                      { "module": "core", "action": "removesession", "name": "portalSecurityAuthVersion", "options": {} },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{$_SERVER.PATH_INFO.contains('/api/')}}",
+                          "then": {
+                            "steps": [
+                              { "module": "core", "action": "response", "options": { "status": 401, "data": { "success": false, "error": "Your session has expired. Please sign in again." } } }
+                            ],
+                            "else": {
+                              "steps": [
+                                { "module": "core", "action": "redirect", "options": { "url": "/login?session=expired", "status": 302 } }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,239 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_PARAM.permission}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Permission is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "restrict",
+        "module": "auth",
+        "action": "restrict",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "super_admin_role",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "columns": [
+              {
+                "table": "r",
+                "column": "id",
+                "alias": "role_id"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "table": "r",
+                    "column": "name"
+                  },
+                  "operation": "=",
+                  "value": "SUPER_ADMIN"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{super_admin_role.role_id}}",
+          "then": {
+            "steps": [
+              {
+                "name": "success",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "success",
+                  "value": true
+                },
+                "output": true
+              },
+              {
+                "name": "permission",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "permission",
+                  "value": "{{$_PARAM.permission}}"
+                },
+                "output": true
+              },
+              {
+                "name": "bypass",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "bypass",
+                  "value": "SUPER_ADMIN"
+                },
+                "output": true
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "permission_match",
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_effective_permissions",
+                    "columns": [
+                      {
+                        "column": "permission_name"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "permission_name"
+                          },
+                          "operation": "=",
+                          "value": "{{$_PARAM.permission}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!permission_match.permission_name}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 403,
+                          "data": {
+                            "success": false,
+                            "error": "Forbidden."
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "success",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "success",
+                  "value": true
+                },
+                "output": true
+              },
+              {
+                "name": "permission",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "permission",
+                  "value": "{{$_PARAM.permission}}"
+                },
+                "output": true
+              },
+              {
+                "name": "bypass",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "bypass",
+                  "value": null
+                },
+                "output": true
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "require_permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "device_imports.view" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{require_permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Forbidden." } } }] } } },
+    { "name": "batch", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "device_import_batches", "alias": "b" }, "columns": [{ "table": "b", "column": "id" }, { "table": "b", "column": "batch_number" }, { "table": "b", "column": "original_filename" }, { "table": "b", "column": "status" }, { "table": "b", "column": "total_rows" }, { "table": "b", "column": "valid_rows" }, { "table": "b", "column": "invalid_rows" }, { "table": "b", "column": "imported_rows" }, { "table": "u", "column": "display_name", "alias": "uploaded_by" }, { "table": "b", "column": "created_at" }, { "table": "b", "column": "validated_at" }, { "table": "b", "column": "committed_at" }, { "table": "b", "column": "cancelled_at" }], "joins": [{ "table": "users", "alias": "u", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "b", "column": "uploaded_by_user_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "b", "column": "id" }, "operation": "=", "value": "{{$_GET.id}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!batch.id}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 404, "data": { "success": false, "error": "Import batch was not found." } } }] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "batch": "{{batch}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Import batch details could not be loaded." } } }] }
+}

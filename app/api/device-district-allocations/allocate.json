@@ -1,0 +1,47 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [
+    { "name": "district_id", "type": "number" },
+    { "name": "device_ids", "type": "array" },
+    { "name": "notes", "type": "text" }
+  ] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "device_district_allocations.manage" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 403, "data": { "success": false, "error": "Only national inventory managers can allocate devices to districts." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_POST.district_id || $_POST.district_id < 1 || !$_POST.device_ids || $_POST.device_ids.length < 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "Select an active district and at least one device." } } }] } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{$_POST.device_ids.length > 500}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "A maximum of 500 devices can be allocated at one time." } } }] } } },
+    { "name": "district", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "districts", "columns": [{ "column": "id" }, { "column": "name" }, { "column": "status" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.district_id}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!district.id || district.status != 'active'}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The selected district is unavailable." } } }] } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "allocation_transaction", "module": "dbupdater", "action": "transaction", "options": { "connection": "db", "exec": { "steps": [
+      { "name": "active_district", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "districts", "columns": [{ "column": "id" }, { "column": "name" }, { "column": "status" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.district_id}}" }] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{!active_district.id || active_district.status != 'active'}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "P5B_DISTRICT_RECHECK_FAILED" } }] } } },
+      { "name": "eligible_devices", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+        "table": { "name": "devices", "alias": "dv" },
+        "joins": [
+          { "table": "device_lifecycle_statuses", "alias": "ls", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "ls", "column": "id", "operation": "=", "value": { "table": "dv", "column": "lifecycle_status_id" } }] } },
+          { "table": "v_device_current_custody", "alias": "cc", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "cc", "column": "device_id", "operation": "=", "value": { "table": "dv", "column": "id" } }] } }
+        ],
+        "columns": [{ "table": "dv", "column": "id" }, { "table": "dv", "column": "serial_number" }, { "table": "ls", "column": "code", "alias": "lifecycle_code" }, { "table": "cc", "column": "current_custody_level" }],
+        "wheres": { "condition": "AND", "rules": [
+          { "data": { "table": "dv", "column": "id" }, "operation": "in", "value": "{{$_POST.device_ids}}" },
+          { "data": { "table": "ls", "column": "code" }, "operation": "=", "value": "AVAILABLE" },
+          { "data": { "table": "cc", "column": "current_custody_level" }, "operation": "=", "value": "CENTRAL" }
+        ] }
+      } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{eligible_devices.length != $_POST.device_ids.length}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "P5B_DEVICE_RECHECK_FAILED" } }] } } },
+      { "name": "allocate_each_device", "module": "core", "action": "repeat", "options": { "repeat": "{{eligible_devices}}", "exec": { "steps": [
+        { "name": "active_allocation", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "device_district_allocations", "columns": [{ "column": "id" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "device_id" }, "operation": "=", "value": "{{id}}" }, { "data": { "column": "active_record_key" }, "operation": "=", "value": 1 }] } } } },
+        { "module": "core", "action": "condition", "options": { "if": "{{active_allocation > 0}}", "then": { "steps": [{ "module": "core", "action": "error", "options": { "message": "P5B_ALREADY_ALLOCATED" } }] } } },
+        { "name": "allocation", "module": "dbupdater", "action": "insert", "output": true, "options": { "connection": "db", "sql": { "table": "device_district_allocations", "values": [
+          { "column": "device_id", "value": "{{id}}" }, { "column": "district_id", "value": "{{district.id}}" }, { "column": "allocated_by_user_id", "value": "{{identity}}" }, { "column": "allocated_at", "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}" }, { "column": "notes", "value": "{{($_POST.notes || '').trim() || null}}" }, { "column": "active_record_key", "value": 1 }
+        ] } } },
+        { "name": "audit", "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [
+          { "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "device_allocated_to_district" }, { "column": "module", "value": "device_allocations" }, { "column": "entity_type", "value": "device_district_allocation" }, { "column": "entity_id", "value": "{{allocation.identity}}" }, { "column": "description", "value": "{{'Allocated device ' + serial_number + ' to ' + district.name}}" }
+        ] } } }
+      ] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "allocated_count": "{{$_POST.device_ids.length}}", "district_name": "{{district.name}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "One or more devices are no longer eligible. No devices were allocated." } } }] }
+}

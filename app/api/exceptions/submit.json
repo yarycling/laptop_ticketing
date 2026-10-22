@@ -1,0 +1,631 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "exception_case_id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "exceptions.submit"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.exception_case_id || $_POST.exception_case_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid exception case ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "submit_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "repair_exception_cases",
+                      "alias": "ec"
+                    },
+                    "columns": [
+                      {
+                        "table": "ec",
+                        "column": "id"
+                      },
+                      {
+                        "table": "ec",
+                        "column": "repair_job_id"
+                      },
+                      {
+                        "table": "ec",
+                        "column": "current_status_code"
+                      },
+                      {
+                        "table": "ec",
+                        "column": "originating_repair_outcome_id"
+                      },
+                      {
+                        "table": "out",
+                        "column": "code",
+                        "alias": "outcome_code"
+                      },
+                      {
+                        "table": "job",
+                        "column": "completed_at"
+                      },
+                      {
+                        "table": "job",
+                        "column": "repair_centre_location_id"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "ticket_status_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "logistics_status_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "physical_state_code"
+                      },
+                      {
+                        "table": "ctx",
+                        "column": "device_lifecycle_code"
+                      }
+                    ],
+                    "joins": [
+                      {
+                        "table": "repair_outcomes",
+                        "alias": "out",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "out",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "ec",
+                                "column": "originating_repair_outcome_id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "repair_jobs",
+                        "alias": "job",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "job",
+                              "column": "id",
+                              "operation": "=",
+                              "value": {
+                                "table": "ec",
+                                "column": "repair_job_id"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "table": "v_repair_current_context",
+                        "alias": "ctx",
+                        "type": "inner",
+                        "clauses": {
+                          "condition": "AND",
+                          "rules": [
+                            {
+                              "table": "ctx",
+                              "column": "logistics_case_id",
+                              "operation": "=",
+                              "value": {
+                                "table": "ec",
+                                "column": "logistics_case_id"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "ec",
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.exception_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "assessment",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "exception_financial_assessments",
+                      "alias": "a"
+                    },
+                    "columns": [
+                      {
+                        "table": "a",
+                        "column": "id"
+                      },
+                      {
+                        "table": "a",
+                        "column": "created_at"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "a",
+                            "column": "exception_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        }
+                      ]
+                    },
+                    "orders": [
+                      {
+                        "table": "a",
+                        "column": "created_at",
+                        "direction": "desc"
+                      },
+                      {
+                        "table": "a",
+                        "column": "id",
+                        "direction": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "last_review",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": {
+                      "name": "exception_decisions",
+                      "alias": "ed"
+                    },
+                    "columns": [
+                      {
+                        "table": "ed",
+                        "column": "id"
+                      },
+                      {
+                        "table": "ed",
+                        "column": "created_at"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "table": "ed",
+                            "column": "exception_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        },
+                        {
+                          "data": {
+                            "table": "ed",
+                            "column": "decision_type_code"
+                          },
+                          "operation": "=",
+                          "value": "RETURN_FOR_REVIEW"
+                        }
+                      ]
+                    },
+                    "orders": [
+                      {
+                        "table": "ed",
+                        "column": "created_at",
+                        "direction": "desc"
+                      },
+                      {
+                        "table": "ed",
+                        "column": "id",
+                        "direction": "desc"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.id || !['ASSESSMENT_REQUIRED','REPAIR_CENTRE_REVIEW_REQUIRED'].contains(current.current_status_code) || !assessment.id || (last_review.id && assessment.created_at <= last_review.created_at) || !current.completed_at || current.ticket_status_code != 'UNDER_REPAIR' || current.logistics_status_code != 'AT_REPAIR_CENTRE' || current.physical_state_code != 'REPAIR_CENTRE_CUSTODY' || current.device_lifecycle_code != 'IN_REPAIR'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_SUBMIT_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.service_locations.flatten('id').contains(current.repair_centre_location_id)}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_SUBMIT_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "target_status",
+                "module": "core",
+                "action": "setvalue",
+                "output": true,
+                "options": {
+                  "key": "target_status",
+                  "value": "{{current.outcome_code == 'MANUFACTURER_RETURN_REQUIRED' ? 'PENDING_DISTRICT_APPROVAL' : (current.outcome_code == 'REPLACEMENT_REQUIRED' ? 'PENDING_HEAD_OFFICE_APPROVAL' : 'PENDING_DISTRICT_DECISION')}}"
+                }
+              },
+              {
+                "name": "update_case",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "repair_exception_cases",
+                    "values": [
+                      {
+                        "column": "current_status_code",
+                        "value": "{{target_status}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "{{current.current_status_code}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{update_case.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "P8A_SUBMIT_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "status_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "exception_case_status_history",
+                    "values": [
+                      {
+                        "column": "exception_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": "{{current.current_status_code}}"
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "{{target_status}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "Repair Centre submitted the exception assessment for disposition review."
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "decision",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "exception_decisions",
+                    "values": [
+                      {
+                        "column": "exception_case_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "decision_type_code",
+                        "value": "REPAIR_CENTRE_SUBMISSION"
+                      },
+                      {
+                        "column": "decision_code",
+                        "value": "SUBMITTED"
+                      },
+                      {
+                        "column": "reason",
+                        "value": "Exception assessment submitted for approval or district decision."
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "exception_submitted"
+                      },
+                      {
+                        "column": "module",
+                        "value": "exceptions"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "repair_exception_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{current.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Exception assessment submitted for disposition review."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "submitted_case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "repair_exception_cases",
+            "columns": [{ "column": "id" }, { "column": "ticket_id" }, { "column": "logistics_case_id" }, { "column": "current_status_code" }],
+            "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.exception_case_id}}" }] }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{['PENDING_DISTRICT_APPROVAL','PENDING_DISTRICT_DECISION'].contains(submitted_case.current_status_code)}}",
+          "then": {
+            "steps": [{ "name": "notify_district_repair_decision", "module": "core", "action": "exec", "options": { "exec": "notification_from_workflow", "params": { "event_type_code": "DISTRICT_REPAIR_DECISION_REQUIRED", "ticket_id": "{{submitted_case.ticket_id}}", "logistics_case_id": "{{submitted_case.logistics_case_id}}", "exception_case_id": "{{submitted_case.id}}", "source_id": "{{submitted_case.id}}", "actor_user_id": "{{identity}}", "action_type": "EXCEPTION_DETAIL", "action_reference": "{{submitted_case.id}}", "message": "A repair exception is awaiting District Coordinator decision." } } }]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{submitted_case.current_status_code == 'PENDING_HEAD_OFFICE_APPROVAL'}}",
+          "then": {
+            "steps": [{ "name": "notify_head_office_replacement", "module": "core", "action": "exec", "options": { "exec": "notification_from_workflow", "params": { "event_type_code": "HEAD_OFFICE_REPLACEMENT_APPROVAL_REQUIRED", "ticket_id": "{{submitted_case.ticket_id}}", "logistics_case_id": "{{submitted_case.logistics_case_id}}", "exception_case_id": "{{submitted_case.id}}", "source_id": "{{submitted_case.id}}", "actor_user_id": "{{identity}}", "action_type": "EXCEPTION_DETAIL", "action_reference": "{{submitted_case.id}}", "message": "A permanent replacement request is awaiting MOE Head Office approval." } } }]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "exception_case_id": "{{$_POST.exception_case_id}}",
+            "status": "{{target_status}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8A_SUBMIT_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'P8A_SUBMIT_STATE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "A current assessment is required, a new revision is needed after return for review, or the exception state has changed."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "The exception could not be submitted."
+          }
+        }
+      }
+    ]
+  }
+}

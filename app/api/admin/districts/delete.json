@@ -1,0 +1,278 @@
+{
+  "settings": {
+    "options": {
+      "method": "post",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "type": "number",
+        "name": "district_id"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "require_permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "districts.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.district_id || $_POST.district_id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "Choose a valid district."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "district",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "districts",
+              "alias": "d"
+            },
+            "columns": [
+              {
+                "table": "d",
+                "column": "id"
+              },
+              {
+                "table": "d",
+                "column": "name"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "d",
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_POST.district_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!district.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "District was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "school_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "schools",
+              "alias": "s"
+            },
+            "columns": [
+              {
+                "table": "s",
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "s",
+                    "column": "district_id"
+                  },
+                  "operation": "=",
+                  "value": "{{district.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{school_count > 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "This district has associated schools and cannot be deleted."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "delete_district_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "delete_district",
+                "module": "dbupdater",
+                "action": "delete",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "districts",
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{district.id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "audit_district_deleted",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "district.deleted"
+                      },
+                      {
+                        "column": "module",
+                        "value": "organisation"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "district"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{district.id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "District deleted: {{district.name}}"
+                      },
+                      {
+                        "column": "created_at",
+                        "value": "{{NOW}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "district_id": "{{district.id}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 409,
+          "data": {
+            "success": false,
+            "error": "The district is referenced by retained records and cannot be deleted."
+          }
+        }
+      }
+    ]
+  }
+}

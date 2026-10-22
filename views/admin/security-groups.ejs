@@ -1,0 +1,108 @@
+<!-- Wappler include head-page="layouts/main" bootstrap5="local" is="dmx-app" appConnect="local" components="{dmxBootstrap5Modal:{}}" -->
+<meta name="ac:route" content="/admin/security-groups">
+<div class="portal-shell">
+  <dmx-serverconnect id="authContext" url="/api/auth/context"></dmx-serverconnect>
+  <dmx-serverconnect id="groupList" url="/api/admin/security-groups/list"></dmx-serverconnect>
+  <dmx-value id="expandedSecurityGroup" value="SUPER_ADMIN"></dmx-value>
+  <%- await include("../partials/portal-sidebar", { currentPage: "security-groups" }) %>
+
+  <div class="portal-workspace">
+    <%- await include("../partials/portal-topbar", { pageTitle: "Security Groups" }) %>
+    <main class="portal-main security-groups-page" aria-label="Security Groups">
+      <header class="security-groups-heading">
+        <div class="security-groups-heading-copy">
+          <nav class="security-groups-breadcrumb" aria-label="Breadcrumb">
+            <a href="/admin/administration">Administration</a>
+            <i class="fas fa-chevron-right" aria-hidden="true"></i>
+            <span aria-current="page">Security Groups</span>
+          </nav>
+          <h1>Security Groups</h1>
+          <p>Predefined access groups and their permissions. Definitions are read-only.</p>
+        </div>
+        <div class="security-groups-stats" aria-label="Security group totals">
+          <article class="security-groups-stat">
+            <span class="security-groups-stat-icon is-green"><i class="fas fa-users" aria-hidden="true"></i></span>
+            <span><strong dmx-text="groupList.data.groups.count()"></strong><small>Total groups</small></span>
+          </article>
+          <article class="security-groups-stat">
+            <span class="security-groups-stat-icon is-green"><i class="fas fa-user" aria-hidden="true"></i></span>
+            <span><strong dmx-text="groupList.data.groups.where('user_count',0,'>').count()"></strong><small>With users</small></span>
+          </article>
+          <article class="security-groups-stat">
+            <span class="security-groups-stat-icon"><i class="far fa-user" aria-hidden="true"></i></span>
+            <span><strong dmx-text="groupList.data.groups.where('user_count',0,'==').count()"></strong><small>No users</small></span>
+          </article>
+        </div>
+      </header>
+
+      <p class="security-groups-loading" role="status" dmx-show="groupList.state.executing"><i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i> Loading security groups…</p>
+      <div class="alert alert-danger" role="alert" dmx-show="groupList.lastError.status">Security groups could not be loaded. Refresh the page to try again.</div>
+
+      <section class="security-groups-toolbar" aria-label="Filter security groups">
+        <label class="security-groups-search">
+          <i class="fas fa-search" aria-hidden="true"></i>
+          <span class="visually-hidden">Search security groups</span>
+          <input id="groupSearch" type="search" placeholder="Search security groups…" autocomplete="off">
+        </label>
+        <label class="security-groups-scope-filter">
+          <span>Scope</span>
+          <select id="securityGroupScopeFilter" aria-label="Filter by scope">
+            <option value="">All scopes</option>
+            <option value="GLOBAL">Global</option>
+            <option value="NATIONAL">National</option>
+            <option value="DISTRICT">Assigned districts</option>
+            <option value="SCHOOL">Assigned schools</option>
+            <option value="REPAIR_LOCATION">Repair centres</option>
+          </select>
+        </label>
+        <div class="security-groups-toolbar-count"><strong dmx-text="groupList.data.groups.count()"></strong> security groups</div>
+        <label class="security-groups-sort">
+          <span class="visually-hidden">Sort security groups</span>
+          <i class="fas fa-sort-amount-down-alt" aria-hidden="true"></i>
+          <select id="securityGroupSort" aria-label="Sort security groups">
+            <option value="name">Sort by name</option>
+            <option value="users">Sort by users</option>
+          </select>
+          <i class="fas fa-chevron-down" aria-hidden="true"></i>
+        </label>
+      </section>
+
+      <section class="security-groups-list" aria-label="Security group definitions">
+        <article class="security-group-card" dmx-class:is-open="expandedSecurityGroup.value == name"
+          dmx-repeat:groups="securityGroupSort.value == 'users' ? groupList.data.groups.sort('user_count').reverse() : groupList.data.groups.sort('label')"
+          dmx-show="(!groupSearch.value || label.lowercase().contains(groupSearch.value.lowercase()) || name.lowercase().contains(groupSearch.value.lowercase()) || description.lowercase().contains(groupSearch.value.lowercase())) && (!securityGroupScopeFilter.value || (securityGroupScopeFilter.value == 'GLOBAL' && scope_type == 'GLOBAL') || (securityGroupScopeFilter.value == 'NATIONAL' && (scope_type == 'NATIONAL' || scope_type == 'LOGISTICS_NATIONAL')) || (securityGroupScopeFilter.value == scope_type))">
+          <button type="button" class="security-group-summary" dmx-on:click="expandedSecurityGroup.setValue(expandedSecurityGroup.value == name ? '' : name)" dmx-bind:aria-expanded="expandedSecurityGroup.value == name">
+            <span class="security-group-icon">
+              <i class="fas fa-shield-alt" aria-hidden="true" dmx-class:fa-shield-alt="!['TTPOST_LOGISTICS','SUPER_ADMIN','TSTT_OVERSIGHT','MOE_HEAD_OFFICE','ICT_DISTRICT_COORDINATOR','ICT_TECHNICAL_OFFICER'].contains(name)" dmx-class:fa-truck="name == 'TTPOST_LOGISTICS'" dmx-class:fa-crown="name == 'SUPER_ADMIN'" dmx-class:fa-file-alt="name == 'TSTT_OVERSIGHT'" dmx-class:fa-landmark="name == 'MOE_HEAD_OFFICE'" dmx-class:fa-user-friends="name == 'ICT_DISTRICT_COORDINATOR'" dmx-class:fa-laptop="name == 'ICT_TECHNICAL_OFFICER'"></i>
+            </span>
+            <span class="security-group-identity">
+              <span class="security-group-name-line"><strong dmx-text="label"></strong><span class="security-group-system-badge" dmx-show="name == 'SUPER_ADMIN'">System</span></span>
+              <span class="security-group-description" dmx-text="description"></span>
+            </span>
+            <span class="security-group-scope-pill">
+              <i class="fas fa-globe" aria-hidden="true" dmx-show="scope_type == 'GLOBAL' || scope_type == 'NATIONAL' || scope_type == 'LOGISTICS_NATIONAL'"></i>
+              <i class="fas fa-map-marker-alt" aria-hidden="true" dmx-show="scope_type == 'DISTRICT' || scope_type == 'SCHOOL' || scope_type == 'REPAIR_LOCATION'"></i>
+              <span dmx-text="scope_type == 'GLOBAL' ? 'Global' : scope_type == 'DISTRICT' ? 'Assigned districts' : scope_type == 'SCHOOL' ? 'Assigned schools' : scope_type == 'REPAIR_LOCATION' ? 'Assigned repair centres' : scope_type == 'LOGISTICS_NATIONAL' ? 'National logistics' : 'National'"></span>
+            </span>
+            <span class="security-group-user-count" dmx-class:is-populated="user_count > 0"><i class="fas fa-user-friends" aria-hidden="true"></i><span dmx-text="user_count + (user_count == 1 ? ' user' : ' users')"></span></span>
+            <i class="fas fa-chevron-down security-group-chevron" aria-hidden="true" dmx-class:is-expanded="expandedSecurityGroup.value == name"></i>
+          </button>
+          <div class="security-group-details" dmx-show="expandedSecurityGroup.value == name">
+            <div class="security-group-permissions-heading">
+              <i class="fas fa-key" aria-hidden="true"></i>
+              <strong>Assigned permissions</strong>
+              <span><b dmx-text="groupList.data.permissions.where('role_id',id,'==').count()"></b> permissions</span>
+              <i class="fas fa-chevron-up" aria-hidden="true"></i>
+            </div>
+            <div class="security-group-permission-chips">
+              <span class="security-group-permission-chip" dmx-repeat:permission="groupList.data.permissions.where('role_id',id,'==').sort('label')" dmx-text="label"></span>
+              <span class="security-group-permissions-empty" dmx-show="groupList.data.permissions.where('role_id',id,'==').count() == 0">No permissions are assigned to this group.</span>
+            </div>
+          </div>
+        </article>
+        <div class="security-groups-empty" dmx-show="!groupList.state.executing && groupList.data.groups.count() == 0">No security groups are available.</div>
+        <div class="security-groups-empty" dmx-show="groupList.data.groups.count() > 0 && groupList.data.groups.filter('$value.label.lowercase().contains(groupSearch.value.lowercase()) || $value.name.lowercase().contains(groupSearch.value.lowercase()) || $value.description.lowercase().contains(groupSearch.value.lowercase())').filter('!securityGroupScopeFilter.value || $value.scope_type == securityGroupScopeFilter.value || (securityGroupScopeFilter.value == &quot;NATIONAL&quot; &amp;&amp; ($value.scope_type == &quot;NATIONAL&quot; || $value.scope_type == &quot;LOGISTICS_NATIONAL&quot;))').count() == 0">No security groups match these filters.</div>
+      </section>
+    </main>
+  </div>
+</div>

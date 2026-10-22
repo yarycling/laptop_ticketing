@@ -1,0 +1,3228 @@
+{
+  "settings": {
+    "options": {
+      "method": "post"
+    }
+  },
+  "meta": {
+    "$_POST": [
+      {
+        "name": "conversion_request_id",
+        "type": "number"
+      },
+      {
+        "name": "decision",
+        "type": "text"
+      },
+      {
+        "name": "decision_notes",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.approve_conversion"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.conversion_request_id || $_POST.conversion_request_id < 1 || !['APPROVE','REJECT'].contains($_POST.decision) || ($_POST.decision_notes && $_POST.decision_notes.length > 1000)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid conversion request and Head Office decision are required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "decision_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "request",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_conversion_requests",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "temporary_loan_case_id"
+                      },
+                      {
+                        "column": "status_code"
+                      },
+                      {
+                        "column": "active_record_key"
+                      },
+                      {
+                        "column": "original_custody_level"
+                      },
+                      {
+                        "column": "original_district_id"
+                      },
+                      {
+                        "column": "original_school_id"
+                      },
+                      {
+                        "column": "original_student_id"
+                      },
+                      {
+                        "column": "original_district_allocation_id"
+                      },
+                      {
+                        "column": "original_school_allocation_id"
+                      },
+                      {
+                        "column": "original_student_assignment_id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.conversion_request_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "loan",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "v_temporary_loan_queue",
+                    "columns": [
+                      {
+                        "column": "temporary_loan_case_id"
+                      },
+                      {
+                        "column": "loan_number"
+                      },
+                      {
+                        "column": "ticket_id"
+                      },
+                      {
+                        "column": "ticket_number"
+                      },
+                      {
+                        "column": "logistics_case_id"
+                      },
+                      {
+                        "column": "original_device_id"
+                      },
+                      {
+                        "column": "repair_job_id"
+                      },
+                      {
+                        "column": "repair_service_location_id"
+                      },
+                      {
+                        "column": "current_status_code"
+                      },
+                      {
+                        "column": "active_record_key"
+                      },
+                      {
+                        "column": "selected_spare_device_id"
+                      },
+                      {
+                        "column": "selected_spare_lifecycle_code"
+                      },
+                      {
+                        "column": "selected_spare_stock_status"
+                      },
+                      {
+                        "column": "selected_by"
+                      },
+                      {
+                        "column": "selected_at"
+                      },
+                      {
+                        "column": "conversion_status"
+                      },
+                      {
+                        "column": "conversion_request_id"
+                      },
+                      {
+                        "column": "conversion_request_status"
+                      },
+                      {
+                        "column": "original_device_lifecycle_code"
+                      },
+                      {
+                        "column": "ticket_status_code"
+                      },
+                      {
+                        "column": "logistics_status_code"
+                      },
+                      {
+                        "column": "repair_completed_at"
+                      },
+                      {
+                        "column": "manufacturer_return_status_code"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "temporary_loan_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{request.temporary_loan_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!request.id || request.status_code != 'PENDING' || request.active_record_key != 1 || loan.conversion_request_id != request.id || loan.current_status_code != 'CONVERSION_PENDING_HEAD_OFFICE' || loan.conversion_status != 'CONVERSION_PENDING_HEAD_OFFICE' || loan.active_record_key != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_CONVERSION_DECISION_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "request_lock",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_conversion_requests",
+                    "values": [
+                      {
+                        "column": "status_code",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'APPROVED' : 'REJECTED'}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": null
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{request.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status_code"
+                          },
+                          "operation": "=",
+                          "value": "PENDING"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "name": "loan_lock",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_cases",
+                    "values": [
+                      {
+                        "column": "current_status_code",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'CONVERTED_PERMANENT' : 'ACTIVE_LOAN'}}"
+                      },
+                      {
+                        "column": "conversion_status",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'CONVERTED_PERMANENT' : null}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": "{{$_POST.decision == 'APPROVE' ? null : 1}}"
+                      },
+                      {
+                        "column": "closed_at",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'now'.formatDate('yyyy-MM-dd HH:mm:ss') : null}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{loan.temporary_loan_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "conversion_request_id"
+                          },
+                          "operation": "=",
+                          "value": "{{request.id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "CONVERSION_PENDING_HEAD_OFFICE"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{request_lock.affected != 1 || loan_lock.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_CONVERSION_DECISION_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "decision_record",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_conversion_decisions",
+                    "values": [
+                      {
+                        "column": "conversion_request_id",
+                        "value": "{{request.id}}"
+                      },
+                      {
+                        "column": "decision_code",
+                        "value": "{{$_POST.decision}}"
+                      },
+                      {
+                        "column": "decided_by",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "decision_notes",
+                        "value": "{{($_POST.decision_notes || '').trim() || null}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "status_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_status_history",
+                    "values": [
+                      {
+                        "column": "temporary_loan_case_id",
+                        "value": "{{loan.temporary_loan_case_id}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": "CONVERSION_PENDING_HEAD_OFFICE"
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'CONVERTED_PERMANENT' : 'ACTIVE_LOAN'}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'Head Office approved permanent conversion.' : 'Head Office rejected permanent conversion; temporary loan continues.'}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{$_POST.decision == 'REJECT'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "name": "rejection_audit",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "temporary_loan_conversion_rejected"
+                              },
+                              {
+                                "column": "module",
+                                "value": "temporary_loans"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "temporary_loan_case"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{loan.temporary_loan_case_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Head Office rejected permanent conversion; temporary loan remains active."
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "else": {
+                    "steps": [
+                      {
+                        "name": "available",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_lifecycle_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "AVAILABLE"
+                                },
+                                {
+                                  "data": {
+                                    "column": "status"
+                                  },
+                                  "operation": "=",
+                                  "value": "active"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "assigned",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_lifecycle_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "ASSIGNED"
+                                },
+                                {
+                                  "data": {
+                                    "column": "status"
+                                  },
+                                  "operation": "=",
+                                  "value": "active"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "replaced",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_lifecycle_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "REPLACED"
+                                },
+                                {
+                                  "data": {
+                                    "column": "status"
+                                  },
+                                  "operation": "=",
+                                  "value": "active"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "temporary_lifecycle",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_lifecycle_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "TEMPORARY_LOAN"
+                                },
+                                {
+                                  "data": {
+                                    "column": "status"
+                                  },
+                                  "operation": "=",
+                                  "value": "active"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "original_device",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "devices",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "lifecycle_status_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "spare_device",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "devices",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "lifecycle_status_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "original_custody",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_device_current_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "current_custody_level"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_id"
+                              },
+                              {
+                                "column": "student_id"
+                              },
+                              {
+                                "column": "district_allocation_id"
+                              },
+                              {
+                                "column": "school_allocation_id"
+                              },
+                              {
+                                "column": "student_assignment_id"
+                              },
+                              {
+                                "column": "student_assignment_type"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "candidate_custody",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_device_current_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "current_custody_level"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_id"
+                              },
+                              {
+                                "column": "student_id"
+                              },
+                              {
+                                "column": "district_allocation_id"
+                              },
+                              {
+                                "column": "school_allocation_id"
+                              },
+                              {
+                                "column": "student_assignment_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "active_stock",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_stock_locations",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "original_relationship",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_replacements",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "OR",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "original_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "replacement_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "spare_relationship",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_replacements",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "OR",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "original_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "replacement_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "active_case_conflict",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "permanent_replacement_cases",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "replacement_number"
+                              },
+                              {
+                                "column": "exception_case_id"
+                              },
+                              {
+                                "column": "ticket_id"
+                              },
+                              {
+                                "column": "current_status_code"
+                              },
+                              {
+                                "column": "replacement_source_type"
+                              },
+                              {
+                                "column": "active_selection_key"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "original_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "active_case_exception",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "repair_exception_cases",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "ticket_id"
+                              },
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "current_status_code"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{active_case_conflict.exception_case_id || -1}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "spare_case_conflict",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "permanent_replacement_cases",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "replacement_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_selection_key"
+                                  },
+                                  "operator": "is_not_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "active_assignments",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_student_assignments",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "data": {
+                                    "column": "returned_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "student",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "students",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "school_id"
+                              },
+                              {
+                                "column": "status"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{original_custody.student_id || -1}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{!available.id || !assigned.id || !replaced.id || !temporary_lifecycle.id || !original_device.id || !spare_device.id || spare_device.lifecycle_status_id != temporary_lifecycle.id || loan.selected_spare_lifecycle_code != 'TEMPORARY_LOAN' || loan.selected_spare_stock_status != 'NOT_IN_FREE_STOCK' || active_stock.id || original_relationship.id || spare_relationship.id || (active_case_conflict.id && (active_case_conflict.ticket_id != loan.ticket_id || active_case_conflict.current_status_code != 'SELECTION_REQUIRED' || active_case_conflict.replacement_source_type || active_case_conflict.active_selection_key || !active_case_conflict.exception_case_id || active_case_exception.current_status_code != 'REPLACEMENT_APPROVED' || active_case_exception.ticket_id != loan.ticket_id || active_case_exception.device_id != loan.original_device_id)) || spare_case_conflict.id || active_assignments.id || candidate_custody.current_custody_level != 'CENTRAL' || candidate_custody.student_assignment_id || !original_custody.device_id || !['STUDENT','SCHOOL','DISTRICT'].contains(original_custody.current_custody_level) || (original_custody.current_custody_level == 'STUDENT' && (!original_custody.student_assignment_id || !original_custody.school_allocation_id || !original_custody.district_allocation_id || !student.id || student.status != 'active' || student.school_id != original_custody.school_id)) || (original_custody.current_custody_level == 'SCHOOL' && (!original_custody.school_allocation_id || !original_custody.district_allocation_id)) || (original_custody.current_custody_level == 'DISTRICT' && !original_custody.district_allocation_id) || !['IN_REPAIR','MANUFACTURER_RETURN'].contains(loan.original_device_lifecycle_code) || !request.original_custody_level || request.original_custody_level != original_custody.current_custody_level || request.original_district_id != original_custody.district_id || request.original_school_id != original_custody.school_id || request.original_student_id != original_custody.student_id || request.original_district_allocation_id != original_custody.district_allocation_id || request.original_school_allocation_id != original_custody.school_allocation_id || request.original_student_assignment_id != original_custody.student_assignment_id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_CONFLICT"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{active_case_conflict.id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "reuse_replacement_case",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "permanent_replacement_cases",
+                                    "values": [
+                                      {
+                                        "column": "temporary_loan_case_id",
+                                        "value": "{{loan.temporary_loan_case_id}}"
+                                      },
+                                      {
+                                        "column": "replacement_source_type",
+                                        "value": "TEMPORARY_LOAN_CONVERSION"
+                                      },
+                                      {
+                                        "column": "replacement_device_id",
+                                        "value": "{{loan.selected_spare_device_id}}"
+                                      },
+                                      {
+                                        "column": "selected_by",
+                                        "value": "{{loan.selected_by}}"
+                                      },
+                                      {
+                                        "column": "selected_at",
+                                        "value": "{{loan.selected_at}}"
+                                      },
+                                      {
+                                        "column": "current_status_code",
+                                        "value": "COMPLETED"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": null
+                                      },
+                                      {
+                                        "column": "active_selection_key",
+                                        "value": null
+                                      },
+                                      {
+                                        "column": "updated_by",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "completed_by",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "completed_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      },
+                                      {
+                                        "column": "closed_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{active_case_conflict.id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "current_status_code"
+                                          },
+                                          "operation": "=",
+                                          "value": "SELECTION_REQUIRED"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_record_key"
+                                          },
+                                          "operation": "=",
+                                          "value": 1
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "replacement_source_type"
+                                          },
+                                          "operator": "is_null"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_selection_key"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{reuse_replacement_case.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "else": {
+                            "steps": [
+                              {
+                                "name": "new_replacement_case",
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "permanent_replacement_cases",
+                                    "values": [
+                                      {
+                                        "column": "exception_case_id",
+                                        "value": null
+                                      },
+                                      {
+                                        "column": "temporary_loan_case_id",
+                                        "value": "{{loan.temporary_loan_case_id}}"
+                                      },
+                                      {
+                                        "column": "ticket_id",
+                                        "value": "{{loan.ticket_id}}"
+                                      },
+                                      {
+                                        "column": "logistics_case_id",
+                                        "value": "{{loan.logistics_case_id}}"
+                                      },
+                                      {
+                                        "column": "repair_job_id",
+                                        "value": "{{loan.repair_job_id}}"
+                                      },
+                                      {
+                                        "column": "original_device_id",
+                                        "value": "{{loan.original_device_id}}"
+                                      },
+                                      {
+                                        "column": "replacement_source_type",
+                                        "value": "TEMPORARY_LOAN_CONVERSION"
+                                      },
+                                      {
+                                        "column": "replacement_device_id",
+                                        "value": "{{loan.selected_spare_device_id}}"
+                                      },
+                                      {
+                                        "column": "selected_by",
+                                        "value": "{{loan.selected_by}}"
+                                      },
+                                      {
+                                        "column": "selected_at",
+                                        "value": "{{loan.selected_at}}"
+                                      },
+                                      {
+                                        "column": "repair_service_location_id",
+                                        "value": "{{loan.repair_service_location_id}}"
+                                      },
+                                      {
+                                        "column": "current_status_code",
+                                        "value": "COMPLETED"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": null
+                                      },
+                                      {
+                                        "column": "active_selection_key",
+                                        "value": null
+                                      },
+                                      {
+                                        "column": "created_by",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "updated_by",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "completed_by",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "completed_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      },
+                                      {
+                                        "column": "closed_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "name": "replacement_number",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "permanent_replacement_cases",
+                                    "values": [
+                                      {
+                                        "column": "replacement_number",
+                                        "value": "{{'PR' + new_replacement_case.identity}}"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{new_replacement_case.identity}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "replacement_number"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{replacement_number.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_case_id",
+                        "module": "core",
+                        "action": "setvalue",
+                        "output": true,
+                        "options": {
+                          "key": "replacement_case_id",
+                          "value": "{{active_case_conflict.id || new_replacement_case.identity}}"
+                        }
+                      },
+                      {
+                        "name": "replacement_case_number",
+                        "module": "core",
+                        "action": "setvalue",
+                        "output": true,
+                        "options": {
+                          "key": "replacement_case_number",
+                          "value": "{{active_case_conflict.id ? active_case_conflict.replacement_number : 'PR' + new_replacement_case.identity}}"
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.current_custody_level == 'STUDENT'}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "close_original_student",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_student_assignments",
+                                    "values": [
+                                      {
+                                        "column": "returned_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      },
+                                      {
+                                        "column": "returned_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "return_reason",
+                                        "value": "PERMANENT_REPLACEMENT"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": null
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{original_custody.student_assignment_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "device_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{loan.original_device_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_record_key"
+                                          },
+                                          "operation": "=",
+                                          "value": 1
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "returned_at"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{close_original_student.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.current_custody_level == 'SCHOOL'}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "close_original_school",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_school_allocations",
+                                    "values": [
+                                      {
+                                        "column": "returned_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      },
+                                      {
+                                        "column": "returned_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "return_reason",
+                                        "value": "PERMANENT_REPLACEMENT"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": null
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{original_custody.school_allocation_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "device_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{loan.original_device_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_record_key"
+                                          },
+                                          "operation": "=",
+                                          "value": 1
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "returned_at"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{close_original_school.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.current_custody_level == 'DISTRICT'}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "close_original_district",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_district_allocations",
+                                    "values": [
+                                      {
+                                        "column": "returned_at",
+                                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                                      },
+                                      {
+                                        "column": "returned_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "return_reason",
+                                        "value": "PERMANENT_REPLACEMENT"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": null
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{original_custody.district_allocation_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "device_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{loan.original_device_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_record_key"
+                                          },
+                                          "operation": "=",
+                                          "value": 1
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "returned_at"
+                                          },
+                                          "operator": "is_null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{close_original_district.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "close_residual_original_assignments",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_student_assignments",
+                            "values": [
+                              {
+                                "column": "returned_at",
+                                "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                              },
+                              {
+                                "column": "returned_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "return_reason",
+                                "value": "PERMANENT_REPLACEMENT"
+                              },
+                              {
+                                "column": "active_record_key",
+                                "value": null
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "data": {
+                                    "column": "returned_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "close_residual_original_school_allocations",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_school_allocations",
+                            "values": [
+                              {
+                                "column": "returned_at",
+                                "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                              },
+                              {
+                                "column": "returned_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "return_reason",
+                                "value": "PERMANENT_REPLACEMENT"
+                              },
+                              {
+                                "column": "active_record_key",
+                                "value": null
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "data": {
+                                    "column": "returned_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "close_residual_original_district_allocations",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_district_allocations",
+                            "values": [
+                              {
+                                "column": "returned_at",
+                                "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}"
+                              },
+                              {
+                                "column": "returned_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "return_reason",
+                                "value": "PERMANENT_REPLACEMENT"
+                              },
+                              {
+                                "column": "active_record_key",
+                                "value": null
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "data": {
+                                    "column": "returned_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.district_id && !candidate_custody.district_allocation_id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "new_district_allocation",
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_district_allocations",
+                                    "values": [
+                                      {
+                                        "column": "device_id",
+                                        "value": "{{loan.selected_spare_device_id}}"
+                                      },
+                                      {
+                                        "column": "district_id",
+                                        "value": "{{original_custody.district_id}}"
+                                      },
+                                      {
+                                        "column": "allocated_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "notes",
+                                        "value": "{{'Permanent replacement ' + replacement_case_number}}"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": 1
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_after_district",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_device_current_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "district_allocation_id"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_allocation_id"
+                              },
+                              {
+                                "column": "school_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.district_id && (!replacement_after_district.district_allocation_id || replacement_after_district.district_id != original_custody.district_id)}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_CONFLICT"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.school_id && !replacement_after_district.school_allocation_id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "new_school_allocation",
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_school_allocations",
+                                    "values": [
+                                      {
+                                        "column": "device_id",
+                                        "value": "{{loan.selected_spare_device_id}}"
+                                      },
+                                      {
+                                        "column": "district_allocation_id",
+                                        "value": "{{replacement_after_district.district_allocation_id}}"
+                                      },
+                                      {
+                                        "column": "school_id",
+                                        "value": "{{original_custody.school_id}}"
+                                      },
+                                      {
+                                        "column": "allocated_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "notes",
+                                        "value": "{{'Permanent replacement ' + replacement_case_number}}"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": 1
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_after_school",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_device_current_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "district_allocation_id"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_allocation_id"
+                              },
+                              {
+                                "column": "school_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.school_id && (!replacement_after_school.school_allocation_id || replacement_after_school.school_id != original_custody.school_id)}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_CONFLICT"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{original_custody.student_id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "other_primary",
+                                "module": "dbconnector",
+                                "action": "single",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_student_assignments",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "student_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{original_custody.student_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "assignment_type"
+                                          },
+                                          "operation": "=",
+                                          "value": "PRIMARY"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "active_record_key"
+                                          },
+                                          "operation": "=",
+                                          "value": 1
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{other_primary.id}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "name": "new_student_assignment",
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "device_student_assignments",
+                                    "values": [
+                                      {
+                                        "column": "device_id",
+                                        "value": "{{loan.selected_spare_device_id}}"
+                                      },
+                                      {
+                                        "column": "school_allocation_id",
+                                        "value": "{{replacement_after_school.school_allocation_id}}"
+                                      },
+                                      {
+                                        "column": "student_id",
+                                        "value": "{{original_custody.student_id}}"
+                                      },
+                                      {
+                                        "column": "assignment_type",
+                                        "value": "{{original_custody.student_assignment_type || 'PRIMARY'}}"
+                                      },
+                                      {
+                                        "column": "assigned_by_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "notes",
+                                        "value": "{{'Permanent replacement ' + replacement_case_number}}"
+                                      },
+                                      {
+                                        "column": "active_record_key",
+                                        "value": 1
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_final_custody",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_device_current_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "current_custody_level"
+                              },
+                              {
+                                "column": "district_allocation_id"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_allocation_id"
+                              },
+                              {
+                                "column": "school_id"
+                              },
+                              {
+                                "column": "student_assignment_id"
+                              },
+                              {
+                                "column": "student_id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{replacement_final_custody.current_custody_level != original_custody.current_custody_level || (original_custody.district_id && replacement_final_custody.district_id != original_custody.district_id) || (original_custody.school_id && replacement_final_custody.school_id != original_custody.school_id) || (original_custody.student_id && replacement_final_custody.student_id != original_custody.student_id)}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_CONFLICT"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "spare_lifecycle_update",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "devices",
+                            "values": [
+                              {
+                                "column": "lifecycle_status_id",
+                                "value": "{{original_custody.current_custody_level == 'STUDENT' ? assigned.id : available.id}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.selected_spare_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "lifecycle_status_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{spare_device.lifecycle_status_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "original_lifecycle_update",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "devices",
+                            "values": [
+                              {
+                                "column": "lifecycle_status_id",
+                                "value": "{{replaced.id}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "lifecycle_status_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{original_device.lifecycle_status_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{spare_lifecycle_update.affected != 1 || original_lifecycle_update.affected != 1}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_CONFLICT"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "relationship",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_replacements",
+                            "values": [
+                              {
+                                "column": "replacement_case_id",
+                                "value": "{{replacement_case_id}}"
+                              },
+                              {
+                                "column": "original_device_id",
+                                "value": "{{loan.original_device_id}}"
+                              },
+                              {
+                                "column": "replacement_device_id",
+                                "value": "{{loan.selected_spare_device_id}}"
+                              },
+                              {
+                                "column": "reason_code",
+                                "value": "TEMPORARY_LOAN_CONVERSION"
+                              },
+                              {
+                                "column": "approved_exception_case_id",
+                                "value": "{{active_case_conflict.exception_case_id || null}}"
+                              },
+                              {
+                                "column": "created_by",
+                                "value": "{{identity}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "allocation_transfer",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "permanent_replacement_allocation_transfers",
+                            "values": [
+                              {
+                                "column": "replacement_case_id",
+                                "value": "{{replacement_case_id}}"
+                              },
+                              {
+                                "column": "allocation_level",
+                                "value": "{{original_custody.current_custody_level}}"
+                              },
+                              {
+                                "column": "district_id",
+                                "value": "{{original_custody.district_id || null}}"
+                              },
+                              {
+                                "column": "school_id",
+                                "value": "{{original_custody.school_id || null}}"
+                              },
+                              {
+                                "column": "student_id",
+                                "value": "{{original_custody.student_id || null}}"
+                              },
+                              {
+                                "column": "original_district_allocation_id",
+                                "value": "{{original_custody.district_allocation_id || null}}"
+                              },
+                              {
+                                "column": "original_school_allocation_id",
+                                "value": "{{original_custody.school_allocation_id || null}}"
+                              },
+                              {
+                                "column": "original_student_assignment_id",
+                                "value": "{{original_custody.student_assignment_id || null}}"
+                              },
+                              {
+                                "column": "replacement_district_allocation_id",
+                                "value": "{{replacement_final_custody.district_allocation_id || null}}"
+                              },
+                              {
+                                "column": "replacement_school_allocation_id",
+                                "value": "{{replacement_final_custody.school_allocation_id || null}}"
+                              },
+                              {
+                                "column": "replacement_student_assignment_id",
+                                "value": "{{replacement_final_custody.student_assignment_id || null}}"
+                              },
+                              {
+                                "column": "source_stock_location_id",
+                                "value": null
+                              },
+                              {
+                                "column": "transferred_by",
+                                "value": "{{identity}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_history",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "permanent_replacement_status_history",
+                            "values": [
+                              {
+                                "column": "replacement_case_id",
+                                "value": "{{replacement_case_id}}"
+                              },
+                              {
+                                "column": "from_status_code",
+                                "value": "{{active_case_conflict.id ? active_case_conflict.current_status_code : null}}"
+                              },
+                              {
+                                "column": "to_status_code",
+                                "value": "COMPLETED"
+                              },
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "reason",
+                                "value": "{{active_case_conflict.id ? 'Head Office approved the temporary loan conversion and completed this approved exception replacement.' : 'Head Office approved permanent conversion of the issued temporary spare.'}}"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{active_case_conflict.exception_case_id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "complete_exception",
+                                "module": "dbupdater",
+                                "action": "update",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "repair_exception_cases",
+                                    "values": [
+                                      {
+                                        "column": "current_status_code",
+                                        "value": "PERMANENT_REPLACEMENT_COMPLETED"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{active_case_conflict.exception_case_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "current_status_code"
+                                          },
+                                          "operation": "=",
+                                          "value": "REPLACEMENT_APPROVED"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{complete_exception.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "TL_CONVERSION_CONFLICT"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "name": "exception_history",
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "exception_case_status_history",
+                                    "values": [
+                                      {
+                                        "column": "exception_case_id",
+                                        "value": "{{active_case_conflict.exception_case_id}}"
+                                      },
+                                      {
+                                        "column": "from_status_code",
+                                        "value": "REPLACEMENT_APPROVED"
+                                      },
+                                      {
+                                        "column": "to_status_code",
+                                        "value": "PERMANENT_REPLACEMENT_COMPLETED"
+                                      },
+                                      {
+                                        "column": "actor_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "reason",
+                                        "value": "Approved exception completed through the linked temporary-loan conversion."
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "custody",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "temporary_loan_custody_history",
+                            "values": [
+                              {
+                                "column": "temporary_loan_case_id",
+                                "value": "{{loan.temporary_loan_case_id}}"
+                              },
+                              {
+                                "column": "device_id",
+                                "value": "{{loan.selected_spare_device_id}}"
+                              },
+                              {
+                                "column": "from_custody_code",
+                                "value": "TEMPORARY_LOAN_ISSUED"
+                              },
+                              {
+                                "column": "to_custody_code",
+                                "value": "CONVERTED_TO_PERMANENT"
+                              },
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "notes",
+                                "value": "Temporary-loan custody ended by permanent conversion; device remains with its current recipient."
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "conversion_audit",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "temporary_loan_converted_permanent"
+                              },
+                              {
+                                "column": "module",
+                                "value": "temporary_loans"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "temporary_loan_case"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{loan.temporary_loan_case_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Head Office permanently converted the issued temporary spare; recipient custody was retained."
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "returned_ticket_status",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "ticket_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "RETURNED"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "current_ticket_status",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "ticket_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "UNDER_REPAIR"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "fulfilled_logistics_status",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "logistics_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "FULFILLED_AT_RECIPIENT"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "current_logistics_status",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "logistics_statuses",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "code"
+                                  },
+                                  "operation": "=",
+                                  "value": "AT_REPAIR_CENTRE"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{!returned_ticket_status.id || !current_ticket_status.id || !fulfilled_logistics_status.id || !current_logistics_status.id || loan.ticket_status_code != 'UNDER_REPAIR' || loan.logistics_status_code != 'AT_REPAIR_CENTRE'}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_FULFILLMENT_STATE"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "close_ticket_as_returned",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "tickets",
+                            "values": [
+                              {
+                                "column": "current_status_id",
+                                "value": "{{returned_ticket_status.id}}"
+                              },
+                              {
+                                "column": "closed_at",
+                                "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.ticket_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "current_status_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{current_ticket_status.id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "closed_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{close_ticket_as_returned.affected != 1}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_TICKET_CLOSE"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "ticket_fulfillment_history",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "ticket_status_history",
+                            "values": [
+                              {
+                                "column": "ticket_id",
+                                "value": "{{loan.ticket_id}}"
+                              },
+                              {
+                                "column": "from_status_id",
+                                "value": "{{current_ticket_status.id}}"
+                              },
+                              {
+                                "column": "to_status_id",
+                                "value": "{{returned_ticket_status.id}}"
+                              },
+                              {
+                                "column": "changed_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "reason",
+                                "value": "TEMPORARY_LOAN_CONVERSION"
+                              },
+                              {
+                                "column": "comment",
+                                "value": "Permanent replacement fulfilled at recipient through temporary-loan conversion; no Phase 7F return transport was required."
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "close_logistics_as_fulfilled",
+                        "module": "dbupdater",
+                        "action": "update",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "ticket_logistics_cases",
+                            "values": [
+                              {
+                                "column": "current_status_id",
+                                "value": "{{fulfilled_logistics_status.id}}"
+                              },
+                              {
+                                "column": "closed_at",
+                                "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}"
+                              },
+                              {
+                                "column": "closed_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "close_reason",
+                                "value": "TEMPORARY_LOAN_CONVERSION"
+                              },
+                              {
+                                "column": "updated_by_user_id",
+                                "value": "{{identity}}"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{loan.logistics_case_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "current_status_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{current_logistics_status.id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "data": {
+                                    "column": "closed_at"
+                                  },
+                                  "operator": "is_null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{close_logistics_as_fulfilled.affected != 1}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "TL_CONVERSION_LOGISTICS_CLOSE"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "logistics_fulfillment_history",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "logistics_status_history",
+                            "values": [
+                              {
+                                "column": "logistics_case_id",
+                                "value": "{{loan.logistics_case_id}}"
+                              },
+                              {
+                                "column": "from_status_id",
+                                "value": "{{current_logistics_status.id}}"
+                              },
+                              {
+                                "column": "to_status_id",
+                                "value": "{{fulfilled_logistics_status.id}}"
+                              },
+                              {
+                                "column": "changed_by_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "reason",
+                                "value": "TEMPORARY_LOAN_CONVERSION"
+                              },
+                              {
+                                "column": "comment",
+                                "value": "Service logistics fulfilled because the permanent replacement was already with the recipient; no Phase 7F return handoff was created."
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "fulfillment_audit",
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "service_fulfilled_at_recipient"
+                              },
+                              {
+                                "column": "module",
+                                "value": "temporary_loans"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "temporary_loan_case"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{loan.temporary_loan_case_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "Ticket closed as RETURNED and logistics fulfilled at recipient through permanent conversion; no Phase 7F return journey was created."
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "sla_return_cancel_conversion",
+                        "module": "core",
+                        "action": "exec",
+                        "output": true,
+                        "options": {
+                          "exec": "sla_cancel",
+                          "params": {
+                            "idempotency_key": "{{'RETURN_LOGISTICS:LOGISTICS:' + loan.logistics_case_id}}",
+                            "cancelled_at": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}",
+                            "reason": "Permanent conversion fulfilled at recipient; no physical return logistics applies.",
+                            "source_entity_type": "temporary_loan_case",
+                            "source_entity_id": "{{loan.temporary_loan_case_id}}",
+                            "actor_user_id": "{{identity}}"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "final_replacement",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "permanent_replacement_cases",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "replacement_number"
+              },
+              {
+                "column": "current_status_code"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "temporary_loan_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{loan.temporary_loan_case_id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "decision": "{{$_POST.decision}}",
+            "temporary_loan_case_id": "{{loan.temporary_loan_case_id}}",
+            "loan_status": "{{$_POST.decision == 'APPROVE' ? 'CONVERTED_PERMANENT' : 'ACTIVE_LOAN'}}",
+            "conversion_request_id": "{{request.id}}",
+            "permanent_replacement_case_id": "{{final_replacement.id || null}}",
+            "replacement_number": "{{final_replacement.replacement_number || null}}",
+            "ticket_status": "{{$_POST.decision == 'APPROVE' ? 'RETURNED' : loan.ticket_status_code}}",
+            "logistics_status": "{{$_POST.decision == 'APPROVE' ? 'FULFILLED_AT_RECIPIENT' : loan.logistics_status_code}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_CONVERSION_DECISION_STATE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "This conversion request has already been decided or is no longer eligible."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_CONVERSION_CONFLICT' || $_EXCEPTION.code == 'ER_DUP_ENTRY'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "The conversion or Phase 5 allocation is no longer eligible. No partial changes were committed."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "The Head Office conversion decision could not be recorded. No partial changes were committed."
+          }
+        }
+      }
+    ]
+  }
+}

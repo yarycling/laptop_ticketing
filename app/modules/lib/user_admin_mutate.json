@@ -1,0 +1,2720 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "target_id",
+          "value": "{{$_POST.user_id || 0}}"
+        },
+        "name": "target_id"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_PARAM.mode == 'create'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "otp",
+                "action": "generateSecret",
+                "options": {
+                  "size": 64
+                },
+                "name": "initial_secret"
+              },
+              {
+                "module": "crypto",
+                "action": "passwordHash",
+                "options": {
+                  "password": "{{initial_secret}}",
+                  "algo": "argon2id"
+                },
+                "name": "initial_password_hash"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "module": "dbupdater",
+                "action": "update",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_administration_lock",
+                    "values": [
+                      {
+                        "column": "touched_at",
+                        "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss.SSS')}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                },
+                "name": "serialize_security_administration"
+              },
+              {
+                "module": "dbconnector",
+                "action": "single",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "users",
+                    "columns": [
+                      {
+                        "column": "id"
+                      },
+                      {
+                        "column": "status"
+                      },
+                      {
+                        "column": "auth_version"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "name": "actor"
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{actor.status != 'active' || actor.auth_version != $_SESSION.portalSecurityAuthVersion}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "admin_error",
+                          "value": "Your session has expired. Please sign in again."
+                        },
+                        "name": "admin_error"
+                      },
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "USER_ADMIN_VALIDATION"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "exec",
+                "options": {
+                  "exec": "security_require_super_admin",
+                  "params": {}
+                },
+                "name": "current_admin"
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{$_PARAM.mode == 'create'}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "full_name",
+                          "value": "{{($_POST.full_name || '').trim()}}"
+                        },
+                        "name": "full_name"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "email",
+                          "value": "{{($_POST.email || '').trim().lowercase()}}"
+                        },
+                        "name": "email"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "new_status",
+                          "value": "{{$_POST.status || 'active'}}"
+                        },
+                        "name": "new_status"
+                      },
+                      {
+                        "module": "validator",
+                        "action": "validate",
+                        "options": {
+                          "noError": true,
+                          "data": [
+                            {
+                              "name": "name",
+                              "value": "{{full_name}}",
+                              "rules": {
+                                "core:required": {},
+                                "core:maxlength": {
+                                  "param": 220
+                                }
+                              }
+                            },
+                            {
+                              "name": "email",
+                              "value": "{{email}}",
+                              "rules": {
+                                "core:required": {},
+                                "core:email": {},
+                                "core:maxlength": {
+                                  "param": 254
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "name": "profile_valid"
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{!profile_valid || (new_status != 'active' && new_status != 'disabled')}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "admin_error",
+                                  "value": "Enter a full name, a valid email address and Active or Inactive status."
+                                },
+                                "name": "admin_error"
+                              },
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "USER_ADMIN_VALIDATION"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "username",
+                          "value": "{{($_POST.username || '').trim().lowercase()}}"
+                        },
+                        "name": "username"
+                      },
+                      {
+                        "module": "validator",
+                        "action": "validate",
+                        "options": {
+                          "noError": true,
+                          "data": [
+                            {
+                              "name": "username",
+                              "value": "{{username}}",
+                              "rules": {
+                                "core:required": {},
+                                "core:maxlength": {
+                                  "param": 150
+                                },
+                                "core:pattern": {
+                                  "param": "^[a-z0-9][a-z0-9._-]*$"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "name": "username_valid"
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{!username_valid}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "admin_error",
+                                  "value": "Use a unique username containing letters, digits, dots, underscores or hyphens."
+                                },
+                                "name": "admin_error"
+                              },
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "USER_ADMIN_VALIDATION"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "role_codes",
+                          "value": "{{$_POST.role_codes || []}}"
+                        },
+                        "name": "role_codes"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "district_ids",
+                          "value": "{{$_POST.district_ids || []}}"
+                        },
+                        "name": "district_ids"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "school_ids",
+                          "value": "{{$_POST.school_ids || []}}"
+                        },
+                        "name": "school_ids"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "school_district_ids",
+                          "value": "{{$_POST.school_district_ids || []}}"
+                        },
+                        "name": "school_district_ids"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "service_location_ids",
+                          "value": "{{$_POST.service_location_ids || []}}"
+                        },
+                        "name": "service_location_ids"
+                      },
+                      {
+                        "module": "core",
+                        "action": "exec",
+                        "options": {
+                          "exec": "user_admin_validate_access",
+                          "params": {}
+                        },
+                        "name": "access"
+                      },
+                      {
+                        "module": "dbconnector",
+                        "action": "single",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "users",
+                            "columns": [
+                              {
+                                "column": "id"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "!=",
+                                  "value": "{{target_id}}"
+                                },
+                                {
+                                  "condition": "OR",
+                                  "rules": [
+                                    {
+                                      "data": {
+                                        "column": "email"
+                                      },
+                                      "operation": "=",
+                                      "value": "{{email}}"
+                                    },
+                                    {
+                                      "data": {
+                                        "column": "username"
+                                      },
+                                      "operation": "=",
+                                      "value": "{{email}}"
+                                    },
+                                    {
+                                      "data": {
+                                        "column": "username"
+                                      },
+                                      "operation": "=",
+                                      "value": "{{username}}"
+                                    },
+                                    {
+                                      "data": {
+                                        "column": "email"
+                                      },
+                                      "operation": "=",
+                                      "value": "{{username}}"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "name": "duplicate"
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{duplicate.id}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "admin_error",
+                                  "value": "Username or email is already in use."
+                                },
+                                "name": "admin_error"
+                              },
+                              {
+                                "module": "core",
+                                "action": "error",
+                                "options": {
+                                  "message": "USER_ADMIN_VALIDATION"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "users",
+                            "values": [
+                              {
+                                "column": "username",
+                                "value": "{{username}}"
+                              },
+                              {
+                                "column": "email",
+                                "value": "{{email}}"
+                              },
+                              {
+                                "column": "display_name",
+                                "value": "{{full_name}}"
+                              },
+                              {
+                                "column": "first_name",
+                                "value": "{{full_name.split(' ').first().substr(0,100)}}"
+                              },
+                              {
+                                "column": "last_name",
+                                "value": ""
+                              },
+                              {
+                                "column": "status",
+                                "value": "{{new_status}}"
+                              },
+                              {
+                                "column": "password_hash",
+                                "value": "{{initial_password_hash}}"
+                              },
+                              {
+                                "column": "auth_version",
+                                "value": 1
+                              }
+                            ]
+                          }
+                        },
+                        "name": "created"
+                      },
+                      {
+                        "module": "core",
+                        "action": "setvalue",
+                        "options": {
+                          "key": "target_id",
+                          "value": "{{created.identity}}"
+                        },
+                        "name": "target_id"
+                      },
+                      {
+                        "module": "dbupdater",
+                        "action": "delete",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "user_roles",
+                            "values": [],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "user_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{target_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "name": "remove_old_roles"
+                      },
+                      {
+                        "module": "core",
+                        "action": "repeat",
+                        "options": {
+                          "repeat": "{{access.new_roles}}",
+                          "exec": {
+                            "steps": [
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "user_roles",
+                                    "values": [
+                                      {
+                                        "column": "user_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "role_id",
+                                        "value": "{{id}}"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "mapping"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "assign_roles"
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{access.national_access}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "user_national_scopes",
+                                    "values": [
+                                      {
+                                        "column": "user_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "assigned_by",
+                                        "value": "{{identity}}"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "national"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "repeat",
+                        "options": {
+                          "repeat": "{{district_ids}}",
+                          "exec": {
+                            "steps": [
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "user_district_scopes",
+                                    "values": [
+                                      {
+                                        "column": "user_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "district_id",
+                                        "value": "{{$value}}"
+                                      },
+                                      {
+                                        "column": "assigned_by",
+                                        "value": "{{identity}}"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "scope"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "assign_district"
+                      },
+                      {
+                        "module": "core",
+                        "action": "repeat",
+                        "options": {
+                          "repeat": "{{school_ids}}",
+                          "exec": {
+                            "steps": [
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "user_school_scopes",
+                                    "values": [
+                                      {
+                                        "column": "user_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "school_id",
+                                        "value": "{{$value}}"
+                                      },
+                                      {
+                                        "column": "assigned_by",
+                                        "value": "{{identity}}"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "scope"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "assign_school"
+                      },
+                      {
+                        "module": "core",
+                        "action": "repeat",
+                        "options": {
+                          "repeat": "{{service_location_ids}}",
+                          "exec": {
+                            "steps": [
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "user_service_location_scopes",
+                                    "values": [
+                                      {
+                                        "column": "user_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "service_location_id",
+                                        "value": "{{$value}}"
+                                      },
+                                      {
+                                        "column": "assigned_by",
+                                        "value": "{{identity}}"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "scope"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "assign_service_location"
+                      },
+                      {
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "USER_CREATED"
+                              },
+                              {
+                                "column": "module",
+                                "value": "user_administration"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "user"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{target_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "User administration completed."
+                              }
+                            ]
+                          }
+                        },
+                        "name": "audit_user_created"
+                      },
+                      {
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "USER_SECURITY_GROUP_CHANGED"
+                              },
+                              {
+                                "column": "module",
+                                "value": "user_administration"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "user"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{target_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "{{'Security groups: ' + access.new_roles.flatten('name').join(', ')}}"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "audit_user_security_group_changed"
+                      },
+                      {
+                        "module": "dbupdater",
+                        "action": "insert",
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "audit_logs",
+                            "values": [
+                              {
+                                "column": "actor_user_id",
+                                "value": "{{identity}}"
+                              },
+                              {
+                                "column": "action",
+                                "value": "USER_SCOPE_CHANGED"
+                              },
+                              {
+                                "column": "module",
+                                "value": "user_administration"
+                              },
+                              {
+                                "column": "entity_type",
+                                "value": "user"
+                              },
+                              {
+                                "column": "entity_id",
+                                "value": "{{target_id}}"
+                              },
+                              {
+                                "column": "description",
+                                "value": "{{'Assigned district IDs: ' + district_ids.join(',') + '; school IDs: ' + school_ids.join(',') + '; location IDs: ' + service_location_ids.join(',') + '; national: ' + access.national_access}}"
+                              }
+                            ]
+                          }
+                        },
+                        "name": "audit_user_scope_changed"
+                      }
+                    ]
+                  },
+                  "else": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{$_PARAM.mode == 'update'}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "module": "dbconnector",
+                                "action": "single",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      },
+                                      {
+                                        "column": "username"
+                                      },
+                                      {
+                                        "column": "email"
+                                      },
+                                      {
+                                        "column": "display_name"
+                                      },
+                                      {
+                                        "column": "status"
+                                      },
+                                      {
+                                        "column": "auth_version"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "previous"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{!previous.id}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "User not found."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_roles",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      },
+                                      {
+                                        "column": "name"
+                                      },
+                                      {
+                                        "column": "label"
+                                      }
+                                    ],
+                                    "orders": [
+                                      {
+                                        "column": "name",
+                                        "direction": "asc"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "old_roles"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_scopes",
+                                    "columns": [
+                                      {
+                                        "column": "scope_type"
+                                      },
+                                      {
+                                        "column": "entity_id"
+                                      },
+                                      {
+                                        "column": "district_id"
+                                      },
+                                      {
+                                        "column": "label"
+                                      },
+                                      {
+                                        "column": "entity_active"
+                                      }
+                                    ],
+                                    "orders": [
+                                      {
+                                        "column": "scope_type",
+                                        "direction": "asc"
+                                      },
+                                      {
+                                        "column": "entity_id",
+                                        "direction": "asc"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "old_scopes"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "full_name",
+                                  "value": "{{($_POST.full_name || '').trim()}}"
+                                },
+                                "name": "full_name"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "email",
+                                  "value": "{{($_POST.email || '').trim().lowercase()}}"
+                                },
+                                "name": "email"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "new_status",
+                                  "value": "{{$_POST.status || 'active'}}"
+                                },
+                                "name": "new_status"
+                              },
+                              {
+                                "module": "validator",
+                                "action": "validate",
+                                "options": {
+                                  "noError": true,
+                                  "data": [
+                                    {
+                                      "name": "name",
+                                      "value": "{{full_name}}",
+                                      "rules": {
+                                        "core:required": {},
+                                        "core:maxlength": {
+                                          "param": 220
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "name": "email",
+                                      "value": "{{email}}",
+                                      "rules": {
+                                        "core:required": {},
+                                        "core:email": {},
+                                        "core:maxlength": {
+                                          "param": 254
+                                        }
+                                      }
+                                    }
+                                  ]
+                                },
+                                "name": "profile_valid"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{!profile_valid || (new_status != 'active' && new_status != 'disabled')}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "Enter a full name, a valid email address and Active or Inactive status."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "username",
+                                  "value": "{{previous.username}}"
+                                },
+                                "name": "username"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{$_POST.username && $_POST.username != previous.username}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "Username cannot be changed."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "role_codes",
+                                  "value": "{{$_POST.role_codes || []}}"
+                                },
+                                "name": "role_codes"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "district_ids",
+                                  "value": "{{$_POST.district_ids || []}}"
+                                },
+                                "name": "district_ids"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "school_ids",
+                                  "value": "{{$_POST.school_ids || []}}"
+                                },
+                                "name": "school_ids"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "school_district_ids",
+                                  "value": "{{$_POST.school_district_ids || []}}"
+                                },
+                                "name": "school_district_ids"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "service_location_ids",
+                                  "value": "{{$_POST.service_location_ids || []}}"
+                                },
+                                "name": "service_location_ids"
+                              },
+                              {
+                                "module": "core",
+                                "action": "exec",
+                                "options": {
+                                  "exec": "user_admin_validate_access",
+                                  "params": {}
+                                },
+                                "name": "access"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "single",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "!=",
+                                          "value": "{{target_id}}"
+                                        },
+                                        {
+                                          "condition": "OR",
+                                          "rules": [
+                                            {
+                                              "data": {
+                                                "column": "email"
+                                              },
+                                              "operation": "=",
+                                              "value": "{{email}}"
+                                            },
+                                            {
+                                              "data": {
+                                                "column": "username"
+                                              },
+                                              "operation": "=",
+                                              "value": "{{email}}"
+                                            },
+                                            {
+                                              "data": {
+                                                "column": "username"
+                                              },
+                                              "operation": "=",
+                                              "value": "{{username}}"
+                                            },
+                                            {
+                                              "data": {
+                                                "column": "email"
+                                              },
+                                              "operation": "=",
+                                              "value": "{{username}}"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "duplicate"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{duplicate.id}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "Username or email is already in use."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_roles",
+                                    "columns": [
+                                      {
+                                        "column": "user_id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "name"
+                                          },
+                                          "operation": "=",
+                                          "value": "SUPER_ADMIN"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "!=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "other_admins"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "count",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "columns": [],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operator": "in",
+                                          "value": "{{other_admins.flatten('user_id')}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "status"
+                                          },
+                                          "operation": "=",
+                                          "value": "active"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "active_others"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{previous.status == 'active' && old_roles.where('name','==','SUPER_ADMIN').count() && (new_status != 'active' || !role_codes.contains('SUPER_ADMIN')) && active_others == 0}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "At least one active Super Administrator must remain."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{$_POST.auth_version != previous.auth_version}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "This user changed since the form opened. Reload and try again."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "roles_changed",
+                                  "value": "{{old_roles.flatten('name').join('|') != access.new_roles.flatten('name').join('|')}}"
+                                },
+                                "name": "roles_changed"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "scopes_changed",
+                                  "value": "{{old_scopes.where('scope_type','==','NATIONAL').count() != (access.national_access ? 1 : 0) || old_scopes.where('scope_type','==','DISTRICT').flatten('entity_id').sort().join(',') != district_ids.sort().join(',') || old_scopes.where('scope_type','==','SCHOOL').flatten('entity_id').sort().join(',') != school_ids.sort().join(',') || old_scopes.where('scope_type','==','REPAIR_LOCATION').flatten('entity_id').sort().join(',') != service_location_ids.sort().join(',')}}"
+                                },
+                                "name": "scopes_changed"
+                              },
+                              {
+                                "module": "dbupdater",
+                                "action": "update",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "values": [
+                                      {
+                                        "column": "display_name",
+                                        "value": "{{full_name}}"
+                                      },
+                                      {
+                                        "column": "email",
+                                        "value": "{{email}}"
+                                      },
+                                      {
+                                        "column": "status",
+                                        "value": "{{new_status}}"
+                                      },
+                                      {
+                                        "column": "auth_version",
+                                        "value": "{{previous.auth_version + (roles_changed || scopes_changed || previous.status != new_status || previous.email != email ? 1 : 0)}}"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "auth_version"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{previous.auth_version}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "update_profile"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{update_profile.affected != 1}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "This user changed concurrently. Reload and try again."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{roles_changed}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "delete",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "user_roles",
+                                            "values": [],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "remove_old_roles"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "repeat",
+                                        "options": {
+                                          "repeat": "{{access.new_roles}}",
+                                          "exec": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "user_roles",
+                                                    "values": [
+                                                      {
+                                                        "column": "user_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "role_id",
+                                                        "value": "{{id}}"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "mapping"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "assign_roles"
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "insert",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "audit_logs",
+                                            "values": [
+                                              {
+                                                "column": "actor_user_id",
+                                                "value": "{{identity}}"
+                                              },
+                                              {
+                                                "column": "action",
+                                                "value": "USER_SECURITY_GROUP_CHANGED"
+                                              },
+                                              {
+                                                "column": "module",
+                                                "value": "user_administration"
+                                              },
+                                              {
+                                                "column": "entity_type",
+                                                "value": "user"
+                                              },
+                                              {
+                                                "column": "entity_id",
+                                                "value": "{{target_id}}"
+                                              },
+                                              {
+                                                "column": "description",
+                                                "value": "{{'From ' + old_roles.flatten('name').join(',') + ' to ' + access.new_roles.flatten('name').join(',')}}"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "audit_user_security_group_changed"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{scopes_changed}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "user_national_scopes",
+                                            "values": [
+                                              {
+                                                "column": "status",
+                                                "value": "revoked"
+                                              },
+                                              {
+                                                "column": "revoked_at",
+                                                "value": "{{NOW}}"
+                                              },
+                                              {
+                                                "column": "revoked_by",
+                                                "value": "{{identity}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "status"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "active"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "revoke_national"
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "user_district_scopes",
+                                            "values": [
+                                              {
+                                                "column": "status",
+                                                "value": "revoked"
+                                              },
+                                              {
+                                                "column": "revoked_at",
+                                                "value": "{{NOW}}"
+                                              },
+                                              {
+                                                "column": "revoked_by",
+                                                "value": "{{identity}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "status"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "active"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "revoke_district"
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "user_school_scopes",
+                                            "values": [
+                                              {
+                                                "column": "status",
+                                                "value": "revoked"
+                                              },
+                                              {
+                                                "column": "revoked_at",
+                                                "value": "{{NOW}}"
+                                              },
+                                              {
+                                                "column": "revoked_by",
+                                                "value": "{{identity}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "status"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "active"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "revoke_school"
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "user_service_location_scopes",
+                                            "values": [
+                                              {
+                                                "column": "status",
+                                                "value": "revoked"
+                                              },
+                                              {
+                                                "column": "revoked_at",
+                                                "value": "{{NOW}}"
+                                              },
+                                              {
+                                                "column": "revoked_by",
+                                                "value": "{{identity}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "status"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "active"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "revoke_service_location"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{access.national_access}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "user_national_scopes",
+                                                    "values": [
+                                                      {
+                                                        "column": "user_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "assigned_by",
+                                                        "value": "{{identity}}"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "national"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "repeat",
+                                        "options": {
+                                          "repeat": "{{district_ids}}",
+                                          "exec": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "user_district_scopes",
+                                                    "values": [
+                                                      {
+                                                        "column": "user_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "district_id",
+                                                        "value": "{{$value}}"
+                                                      },
+                                                      {
+                                                        "column": "assigned_by",
+                                                        "value": "{{identity}}"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "scope"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "assign_district"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "repeat",
+                                        "options": {
+                                          "repeat": "{{school_ids}}",
+                                          "exec": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "user_school_scopes",
+                                                    "values": [
+                                                      {
+                                                        "column": "user_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "school_id",
+                                                        "value": "{{$value}}"
+                                                      },
+                                                      {
+                                                        "column": "assigned_by",
+                                                        "value": "{{identity}}"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "scope"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "assign_school"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "repeat",
+                                        "options": {
+                                          "repeat": "{{service_location_ids}}",
+                                          "exec": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "user_service_location_scopes",
+                                                    "values": [
+                                                      {
+                                                        "column": "user_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "service_location_id",
+                                                        "value": "{{$value}}"
+                                                      },
+                                                      {
+                                                        "column": "assigned_by",
+                                                        "value": "{{identity}}"
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "scope"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "assign_service_location"
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "insert",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "audit_logs",
+                                            "values": [
+                                              {
+                                                "column": "actor_user_id",
+                                                "value": "{{identity}}"
+                                              },
+                                              {
+                                                "column": "action",
+                                                "value": "USER_SCOPE_CHANGED"
+                                              },
+                                              {
+                                                "column": "module",
+                                                "value": "user_administration"
+                                              },
+                                              {
+                                                "column": "entity_type",
+                                                "value": "user"
+                                              },
+                                              {
+                                                "column": "entity_id",
+                                                "value": "{{target_id}}"
+                                              },
+                                              {
+                                                "column": "description",
+                                                "value": "{{'Previous: ' + old_scopes.flatten('label').join('; ').substr(0,400) + '. New district IDs: ' + district_ids.join(',') + '; school IDs: ' + school_ids.join(',') + '; location IDs: ' + service_location_ids.join(',') + '; national: ' + access.national_access}}"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "name": "audit_user_scope_changed"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{previous.status != new_status}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{new_status == 'active'}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "audit_logs",
+                                                    "values": [
+                                                      {
+                                                        "column": "actor_user_id",
+                                                        "value": "{{identity}}"
+                                                      },
+                                                      {
+                                                        "column": "action",
+                                                        "value": "USER_REACTIVATED"
+                                                      },
+                                                      {
+                                                        "column": "module",
+                                                        "value": "user_administration"
+                                                      },
+                                                      {
+                                                        "column": "entity_type",
+                                                        "value": "user"
+                                                      },
+                                                      {
+                                                        "column": "entity_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "description",
+                                                        "value": "User administration completed."
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "audit_user_reactivated"
+                                              }
+                                            ]
+                                          },
+                                          "else": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "audit_logs",
+                                                    "values": [
+                                                      {
+                                                        "column": "actor_user_id",
+                                                        "value": "{{identity}}"
+                                                      },
+                                                      {
+                                                        "column": "action",
+                                                        "value": "USER_DEACTIVATED"
+                                                      },
+                                                      {
+                                                        "column": "module",
+                                                        "value": "user_administration"
+                                                      },
+                                                      {
+                                                        "column": "entity_type",
+                                                        "value": "user"
+                                                      },
+                                                      {
+                                                        "column": "entity_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "description",
+                                                        "value": "User administration completed."
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "audit_user_deactivated"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{roles_changed || scopes_changed || previous.status != new_status || previous.email != email}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "password_reset_requests",
+                                            "values": [
+                                              {
+                                                "column": "invalidated_at",
+                                                "value": "{{NOW}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "used_at"
+                                                  },
+                                                  "operator": "is_null"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "invalidated_at"
+                                                  },
+                                                  "operator": "is_null"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "invalidate_credentials"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "dbupdater",
+                                "action": "insert",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "audit_logs",
+                                    "values": [
+                                      {
+                                        "column": "actor_user_id",
+                                        "value": "{{identity}}"
+                                      },
+                                      {
+                                        "column": "action",
+                                        "value": "USER_PROFILE_UPDATED"
+                                      },
+                                      {
+                                        "column": "module",
+                                        "value": "user_administration"
+                                      },
+                                      {
+                                        "column": "entity_type",
+                                        "value": "user"
+                                      },
+                                      {
+                                        "column": "entity_id",
+                                        "value": "{{target_id}}"
+                                      },
+                                      {
+                                        "column": "description",
+                                        "value": "User administration completed."
+                                      }
+                                    ]
+                                  }
+                                },
+                                "name": "audit_user_profile_updated"
+                              }
+                            ]
+                          },
+                          "else": {
+                            "steps": [
+                              {
+                                "module": "dbconnector",
+                                "action": "single",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      },
+                                      {
+                                        "column": "username"
+                                      },
+                                      {
+                                        "column": "email"
+                                      },
+                                      {
+                                        "column": "display_name"
+                                      },
+                                      {
+                                        "column": "status"
+                                      },
+                                      {
+                                        "column": "auth_version"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "previous"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{!previous.id}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "User not found."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_roles",
+                                    "columns": [
+                                      {
+                                        "column": "id"
+                                      },
+                                      {
+                                        "column": "name"
+                                      },
+                                      {
+                                        "column": "label"
+                                      }
+                                    ],
+                                    "orders": [
+                                      {
+                                        "column": "name",
+                                        "direction": "asc"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "old_roles"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_scopes",
+                                    "columns": [
+                                      {
+                                        "column": "scope_type"
+                                      },
+                                      {
+                                        "column": "entity_id"
+                                      },
+                                      {
+                                        "column": "district_id"
+                                      },
+                                      {
+                                        "column": "label"
+                                      },
+                                      {
+                                        "column": "entity_active"
+                                      }
+                                    ],
+                                    "orders": [
+                                      {
+                                        "column": "scope_type",
+                                        "direction": "asc"
+                                      },
+                                      {
+                                        "column": "entity_id",
+                                        "direction": "asc"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "old_scopes"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "new_status",
+                                  "value": "{{$_PARAM.mode == 'deactivate' ? 'disabled' : 'active'}}"
+                                },
+                                "name": "new_status"
+                              },
+                              {
+                                "module": "core",
+                                "action": "setvalue",
+                                "options": {
+                                  "key": "role_codes",
+                                  "value": "{{old_roles.flatten('name')}}"
+                                },
+                                "name": "role_codes"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "select",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "admin_user_roles",
+                                    "columns": [
+                                      {
+                                        "column": "user_id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "name"
+                                          },
+                                          "operation": "=",
+                                          "value": "SUPER_ADMIN"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "user_id"
+                                          },
+                                          "operation": "!=",
+                                          "value": "{{target_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "other_admins"
+                              },
+                              {
+                                "module": "dbconnector",
+                                "action": "count",
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "users",
+                                    "columns": [],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "id"
+                                          },
+                                          "operator": "in",
+                                          "value": "{{other_admins.flatten('user_id')}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "status"
+                                          },
+                                          "operation": "=",
+                                          "value": "active"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                "name": "active_others"
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{previous.status == 'active' && old_roles.where('name','==','SUPER_ADMIN').count() && (new_status != 'active' || !role_codes.contains('SUPER_ADMIN')) && active_others == 0}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "admin_error",
+                                          "value": "At least one active Super Administrator must remain."
+                                        },
+                                        "name": "admin_error"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "error",
+                                        "options": {
+                                          "message": "USER_ADMIN_VALIDATION"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{new_status == 'active'}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "district_ids",
+                                          "value": "{{old_scopes.where('scope_type','==','DISTRICT').flatten('entity_id')}}"
+                                        },
+                                        "name": "district_ids"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "school_ids",
+                                          "value": "{{old_scopes.where('scope_type','==','SCHOOL').flatten('entity_id')}}"
+                                        },
+                                        "name": "school_ids"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "school_district_ids",
+                                          "value": "{{old_scopes.where('scope_type','==','SCHOOL').flatten('district_id').unique()}}"
+                                        },
+                                        "name": "school_district_ids"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "setvalue",
+                                        "options": {
+                                          "key": "service_location_ids",
+                                          "value": "{{old_scopes.where('scope_type','==','REPAIR_LOCATION').flatten('entity_id')}}"
+                                        },
+                                        "name": "service_location_ids"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "exec",
+                                        "options": {
+                                          "exec": "user_admin_validate_access",
+                                          "params": {}
+                                        },
+                                        "name": "access"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{old_scopes.where('entity_active','==',0).count() || old_scopes.where('scope_type','==','NATIONAL').count() != (access.national_access ? 1 : 0)}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "module": "core",
+                                                "action": "setvalue",
+                                                "options": {
+                                                  "key": "admin_error",
+                                                  "value": "Correct the user scope before reactivation."
+                                                },
+                                                "name": "admin_error"
+                                              },
+                                              {
+                                                "module": "core",
+                                                "action": "error",
+                                                "options": {
+                                                  "message": "USER_ADMIN_VALIDATION"
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "module": "core",
+                                "action": "condition",
+                                "options": {
+                                  "if": "{{previous.status != new_status}}",
+                                  "then": {
+                                    "steps": [
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "users",
+                                            "values": [
+                                              {
+                                                "column": "status",
+                                                "value": "{{new_status}}"
+                                              },
+                                              {
+                                                "column": "auth_version",
+                                                "value": "{{previous.auth_version + 1}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "auth_version"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{previous.auth_version}}"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "update_status"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{update_status.affected != 1}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "module": "core",
+                                                "action": "setvalue",
+                                                "options": {
+                                                  "key": "admin_error",
+                                                  "value": "This user changed concurrently. Reload and try again."
+                                                },
+                                                "name": "admin_error"
+                                              },
+                                              {
+                                                "module": "core",
+                                                "action": "error",
+                                                "options": {
+                                                  "message": "USER_ADMIN_VALIDATION"
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "module": "dbupdater",
+                                        "action": "update",
+                                        "options": {
+                                          "connection": "db",
+                                          "sql": {
+                                            "table": "password_reset_requests",
+                                            "values": [
+                                              {
+                                                "column": "invalidated_at",
+                                                "value": "{{NOW}}"
+                                              }
+                                            ],
+                                            "wheres": {
+                                              "condition": "AND",
+                                              "rules": [
+                                                {
+                                                  "data": {
+                                                    "column": "user_id"
+                                                  },
+                                                  "operation": "=",
+                                                  "value": "{{target_id}}"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "used_at"
+                                                  },
+                                                  "operator": "is_null"
+                                                },
+                                                {
+                                                  "data": {
+                                                    "column": "invalidated_at"
+                                                  },
+                                                  "operator": "is_null"
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "name": "invalidate_credentials"
+                                      },
+                                      {
+                                        "module": "core",
+                                        "action": "condition",
+                                        "options": {
+                                          "if": "{{new_status == 'active'}}",
+                                          "then": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "audit_logs",
+                                                    "values": [
+                                                      {
+                                                        "column": "actor_user_id",
+                                                        "value": "{{identity}}"
+                                                      },
+                                                      {
+                                                        "column": "action",
+                                                        "value": "USER_REACTIVATED"
+                                                      },
+                                                      {
+                                                        "column": "module",
+                                                        "value": "user_administration"
+                                                      },
+                                                      {
+                                                        "column": "entity_type",
+                                                        "value": "user"
+                                                      },
+                                                      {
+                                                        "column": "entity_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "description",
+                                                        "value": "User administration completed."
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "audit_user_reactivated"
+                                              }
+                                            ]
+                                          },
+                                          "else": {
+                                            "steps": [
+                                              {
+                                                "module": "dbupdater",
+                                                "action": "insert",
+                                                "options": {
+                                                  "connection": "db",
+                                                  "sql": {
+                                                    "table": "audit_logs",
+                                                    "values": [
+                                                      {
+                                                        "column": "actor_user_id",
+                                                        "value": "{{identity}}"
+                                                      },
+                                                      {
+                                                        "column": "action",
+                                                        "value": "USER_DEACTIVATED"
+                                                      },
+                                                      {
+                                                        "column": "module",
+                                                        "value": "user_administration"
+                                                      },
+                                                      {
+                                                        "column": "entity_type",
+                                                        "value": "user"
+                                                      },
+                                                      {
+                                                        "column": "entity_id",
+                                                        "value": "{{target_id}}"
+                                                      },
+                                                      {
+                                                        "column": "description",
+                                                        "value": "User administration completed."
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "name": "audit_user_deactivated"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "name": "transaction"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "user_id",
+          "value": "{{target_id}}"
+        },
+        "name": "user_id",
+        "output": true
+      }
+    ]
+  },
+  "meta": {
+    "$_PARAM": [
+      {
+        "name": "mode",
+        "type": "text"
+      }
+    ]
+  }
+}

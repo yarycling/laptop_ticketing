@@ -1,0 +1,1308 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "restrict",
+        "module": "auth",
+        "action": "restrict",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "user",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "users",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "username"
+              },
+              {
+                "column": "email"
+              },
+              {
+                "column": "first_name"
+              },
+              {
+                "column": "last_name"
+              },
+              {
+                "column": "display_name"
+              },
+              {
+                "column": "status"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "role_rows",
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "user_roles",
+              "alias": "ur"
+            },
+            "distinct": true,
+            "columns": [
+              {
+                "table": "r",
+                "column": "name",
+                "alias": "name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "roles",
+                "alias": "r",
+                "type": "inner",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "r",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "ur",
+                        "column": "role_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "ur",
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "r",
+                "column": "name",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "roles",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "roles",
+          "value": "{{role_rows.flatten('name')}}"
+        }
+      },
+      {
+        "name": "is_super_admin",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "is_super_admin",
+          "value": "{{roles.contains('SUPER_ADMIN')}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{is_super_admin}}",
+          "then": {
+            "steps": [
+              {
+                "name": "permission_rows",
+                "module": "dbconnector",
+                "action": "select",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "permissions",
+                    "distinct": true,
+                    "columns": [
+                      {
+                        "column": "name",
+                        "alias": "name"
+                      }
+                    ],
+                    "orders": [
+                      {
+                        "column": "name",
+                        "direction": "asc"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "name": "permission_rows",
+                "module": "dbconnector",
+                "action": "select",
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_effective_permissions",
+                    "distinct": true,
+                    "columns": [
+                      {
+                        "column": "permission_name",
+                        "alias": "name"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        }
+                      ]
+                    },
+                    "orders": [
+                      {
+                        "column": "permission_name",
+                        "direction": "asc"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "permissions",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "permissions",
+          "value": "{{permission_rows.flatten('name')}}"
+        }
+      },
+      {
+        "name": "can_dashboard_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_dashboard_view",
+          "value": "{{permissions.contains('dashboard.view')}}"
+        }
+      },
+      {
+        "name": "can_devices_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_devices_view",
+          "value": "{{permissions.contains('devices.view')}}"
+        }
+      },
+      {
+        "name": "can_devices_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_devices_manage",
+          "value": "{{permissions.contains('devices.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_imports_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_imports_view",
+          "value": "{{permissions.contains('device_imports.view')}}"
+        }
+      },
+      {
+        "name": "can_device_imports_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_imports_manage",
+          "value": "{{permissions.contains('device_imports.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_district_allocations_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_district_allocations_view",
+          "value": "{{permissions.contains('device_district_allocations.view')}}"
+        }
+      },
+      {
+        "name": "can_device_district_allocations_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_district_allocations_manage",
+          "value": "{{permissions.contains('device_district_allocations.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_school_allocations_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_school_allocations_view",
+          "value": "{{permissions.contains('device_school_allocations.view')}}"
+        }
+      },
+      {
+        "name": "can_device_school_allocations_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_school_allocations_manage",
+          "value": "{{permissions.contains('device_school_allocations.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_student_assignments_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_student_assignments_view",
+          "value": "{{permissions.contains('device_student_assignments.view')}}"
+        }
+      },
+      {
+        "name": "can_device_student_assignments_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_student_assignments_manage",
+          "value": "{{permissions.contains('device_student_assignments.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_student_returns_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_student_returns_manage",
+          "value": "{{permissions.contains('device_student_returns.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_school_returns_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_school_returns_manage",
+          "value": "{{permissions.contains('device_school_returns.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_district_returns_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_district_returns_manage",
+          "value": "{{permissions.contains('device_district_returns.manage')}}"
+        }
+      },
+      {
+        "name": "can_students_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_students_view",
+          "value": "{{permissions.contains('students.view')}}"
+        }
+      },
+      {
+        "name": "can_students_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_students_manage",
+          "value": "{{permissions.contains('students.manage')}}"
+        }
+      },
+      {
+        "name": "can_tickets_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_view",
+          "value": "{{permissions.contains('tickets.view') || permissions.contains('tickets.create')}}"
+        }
+      },
+      {
+        "name": "can_logistics_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_view",
+          "value": "{{permissions.contains('logistics.view')}}"
+        }
+      },
+      {
+        "name": "can_logistics_request_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_request_pickup",
+          "value": "{{permissions.contains('logistics.request_pickup')}}"
+        }
+      },
+      {
+        "name": "can_logistics_accept",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_accept",
+          "value": "{{permissions.contains('logistics.accept')}}"
+        }
+      },
+      {
+        "name": "can_logistics_dispatch",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_dispatch",
+          "value": "{{permissions.contains('logistics.dispatch')}}"
+        }
+      },
+      {
+        "name": "can_logistics_receive",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_receive",
+          "value": "{{permissions.contains('logistics.receive')}}"
+        }
+      },
+      {
+        "name": "can_logistics_forward_to_repair",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_forward_to_repair",
+          "value": "{{permissions.contains('logistics.forward_to_repair')}}"
+        }
+      },
+      {
+        "name": "can_logistics_repair_receive",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_repair_receive",
+          "value": "{{permissions.contains('logistics.repair_receive')}}"
+        }
+      },
+      {
+        "name": "can_logistics_return_dispatch",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_return_dispatch",
+          "value": "{{permissions.contains('logistics.return_dispatch')}}"
+        }
+      },
+      {
+        "name": "can_logistics_return_ttpost_receive",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_return_ttpost_receive",
+          "value": "{{permissions.contains('logistics.return_ttpost_receive')}}"
+        }
+      },
+      {
+        "name": "can_logistics_return_school_dispatch",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_return_school_dispatch",
+          "value": "{{permissions.contains('logistics.return_school_dispatch')}}"
+        }
+      },
+      {
+        "name": "can_logistics_return_school_receive",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_return_school_receive",
+          "value": "{{permissions.contains('logistics.return_school_receive')}}"
+        }
+      },
+      {
+        "name": "can_repairs_start",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_repairs_start",
+          "value": "{{permissions.contains('repairs.start')}}"
+        }
+      },
+      {
+        "name": "can_repairs_assess",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_repairs_assess",
+          "value": "{{permissions.contains('repairs.assess')}}"
+        }
+      },
+      {
+        "name": "can_repairs_record_work",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_repairs_record_work",
+          "value": "{{permissions.contains('repairs.record_work')}}"
+        }
+      },
+      {
+        "name": "can_repairs_complete",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_repairs_complete",
+          "value": "{{permissions.contains('repairs.complete')}}"
+        }
+      },
+      {
+        "name": "can_exceptions_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_exceptions_view",
+          "value": "{{permissions.contains('exceptions.view')}}"
+        }
+      },
+      {
+        "name": "can_exceptions_assess",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_exceptions_assess",
+          "value": "{{permissions.contains('exceptions.assess')}}"
+        }
+      },
+      {
+        "name": "can_exceptions_submit",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_exceptions_submit",
+          "value": "{{permissions.contains('exceptions.submit')}}"
+        }
+      },
+      {
+        "name": "can_exceptions_district_decide",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_exceptions_district_decide",
+          "value": "{{permissions.contains('exceptions.district_decide')}}"
+        }
+      },
+      {
+        "name": "can_exceptions_head_office_approve",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_exceptions_head_office_approve",
+          "value": "{{permissions.contains('exceptions.head_office_approve')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_view",
+          "value": "{{permissions.contains('manufacturer_returns.view')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_start",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_start",
+          "value": "{{permissions.contains('manufacturer_returns.start')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_prepare_outbound",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_prepare_outbound",
+          "value": "{{permissions.contains('manufacturer_returns.prepare_outbound')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_external_outbound_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_external_outbound_pickup",
+          "value": "{{permissions.contains('manufacturer_returns.external_outbound_pickup')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_ttpost_outbound_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_ttpost_outbound_pickup",
+          "value": "{{permissions.contains('manufacturer_returns.ttpost_outbound_pickup')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_manufacturer_acknowledge",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_manufacturer_acknowledge",
+          "value": "{{permissions.contains('manufacturer_returns.manufacturer_acknowledge')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_record_outcome",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_record_outcome",
+          "value": "{{permissions.contains('manufacturer_returns.record_outcome')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_prepare_return",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_prepare_return",
+          "value": "{{permissions.contains('manufacturer_returns.prepare_return')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_external_return_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_external_return_pickup",
+          "value": "{{permissions.contains('manufacturer_returns.external_return_pickup')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_ttpost_return_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_ttpost_return_pickup",
+          "value": "{{permissions.contains('manufacturer_returns.ttpost_return_pickup')}}"
+        }
+      },
+      {
+        "name": "can_manufacturer_returns_repair_receive",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_manufacturer_returns_repair_receive",
+          "value": "{{permissions.contains('manufacturer_returns.repair_receive')}}"
+        }
+      },
+      {
+        "name": "can_carriers_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_carriers_view",
+          "value": "{{permissions.contains('carriers.view')}}"
+        }
+      },
+      {
+        "name": "can_carriers_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_carriers_manage",
+          "value": "{{permissions.contains('carriers.manage')}}"
+        }
+      },
+      {
+        "name": "can_sla_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_sla_view",
+          "value": "{{permissions.contains('sla.view')}}"
+        }
+      },
+      {
+        "name": "can_escalations_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_escalations_view",
+          "value": "{{permissions.contains('escalations.view')}}"
+        }
+      },
+      {
+        "name": "can_escalations_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_escalations_manage",
+          "value": "{{permissions.contains('escalations.manage')}}"
+        }
+      },
+      {
+        "name": "can_escalations_respond",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_escalations_respond",
+          "value": "{{permissions.contains('escalations.respond')}}"
+        }
+      },
+      {
+        "name": "can_notifications_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_notifications_view",
+          "value": "{{permissions.contains('notifications.view')}}"
+        }
+      },
+      {
+        "name": "can_notifications_respond",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_notifications_respond",
+          "value": "{{permissions.contains('notifications.respond')}}"
+        }
+      },
+      {
+        "name": "can_notifications_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_notifications_manage",
+          "value": "{{permissions.contains('notifications.manage')}}"
+        }
+      },
+      {
+        "name": "can_sla_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_sla_manage",
+          "value": "{{permissions.contains('sla.manage')}}"
+        }
+      },
+      {
+        "name": "can_device_stock_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_stock_view",
+          "value": "{{permissions.contains('device_stock.view')}}"
+        }
+      },
+      {
+        "name": "can_device_stock_intake",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_stock_intake",
+          "value": "{{permissions.contains('device_stock.intake')}}"
+        }
+      },
+      {
+        "name": "can_device_stock_release",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_device_stock_release",
+          "value": "{{permissions.contains('device_stock.release')}}"
+        }
+      },
+      {
+        "name": "can_replacements_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_replacements_view",
+          "value": "{{permissions.contains('replacements.view')}}"
+        }
+      },
+      {
+        "name": "can_replacements_start",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_replacements_start",
+          "value": "{{permissions.contains('replacements.start')}}"
+        }
+      },
+      {
+        "name": "can_replacements_select",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_replacements_select",
+          "value": "{{permissions.contains('replacements.select')}}"
+        }
+      },
+      {
+        "name": "can_replacements_accept",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_replacements_accept",
+          "value": "{{permissions.contains('replacements.accept')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_view",
+          "value": "{{permissions.contains('temporary_loans.view')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_request",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_request",
+          "value": "{{permissions.contains('temporary_loans.request')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_authorize",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_authorize",
+          "value": "{{permissions.contains('temporary_loans.authorize')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_cancel",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_cancel",
+          "value": "{{permissions.contains('temporary_loans.cancel')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_select_spare",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_select_spare",
+          "value": "{{permissions.contains('temporary_loans.select_spare')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_issue",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_issue",
+          "value": "{{permissions.contains('temporary_loans.issue')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_request_return",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_request_return",
+          "value": "{{permissions.contains('temporary_loans.request_return')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_reclaim",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_reclaim",
+          "value": "{{permissions.contains('temporary_loans.reclaim')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_request_conversion",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_request_conversion",
+          "value": "{{permissions.contains('temporary_loans.request_conversion')}}"
+        }
+      },
+      {
+        "name": "can_temporary_loans_approve_conversion",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_temporary_loans_approve_conversion",
+          "value": "{{permissions.contains('temporary_loans.approve_conversion')}}"
+        }
+      },
+      {
+        "name": "can_logistics_locations_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_logistics_locations_manage",
+          "value": "{{permissions.contains('logistics.locations_manage')}}"
+        }
+      },
+      {
+        "name": "can_spare_pools_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_spare_pools_view",
+          "value": "{{permissions.contains('spare_pools.view')}}"
+        }
+      },
+      {
+        "name": "can_spare_pools_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_spare_pools_manage",
+          "value": "{{permissions.contains('spare_pools.manage')}}"
+        }
+      },
+      {
+        "name": "can_tickets_dashboard",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_dashboard",
+          "value": "{{permissions.contains('tickets.dashboard')}}"
+        }
+      },
+      {
+        "name": "can_tickets_report",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_report",
+          "value": "{{permissions.contains('tickets.report')}}"
+        }
+      },
+      {
+        "name": "can_tickets_create",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_create",
+          "value": "{{permissions.contains('tickets.create')}}"
+        }
+      },
+      {
+        "name": "can_tickets_diagnose",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_diagnose",
+          "value": "{{permissions.contains('tickets.diagnose')}}"
+        }
+      },
+      {
+        "name": "can_tickets_clarification_request",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_clarification_request",
+          "value": "{{permissions.contains('tickets.clarification_request')}}"
+        }
+      },
+      {
+        "name": "can_tickets_clarification_respond",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_clarification_respond",
+          "value": "{{permissions.contains('tickets.clarification_respond')}}"
+        }
+      },
+      {
+        "name": "can_tickets_approve_pickup",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_approve_pickup",
+          "value": "{{permissions.contains('tickets.approve_pickup')}}"
+        }
+      },
+      {
+        "name": "can_tickets_assign",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_assign",
+          "value": "{{permissions.contains('tickets.assign')}}"
+        }
+      },
+      {
+        "name": "can_tickets_claim",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_tickets_claim",
+          "value": "{{permissions.contains('tickets.claim')}}"
+        }
+      },
+      {
+        "name": "can_collections_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_collections_view",
+          "value": "{{permissions.contains('collections.view') || permissions.contains('collections.manage')}}"
+        }
+      },
+      {
+        "name": "can_repairs_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_repairs_view",
+          "value": "{{permissions.contains('repairs.view')}}"
+        }
+      },
+      {
+        "name": "can_returns_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_returns_view",
+          "value": "{{permissions.contains('returns.view') || permissions.contains('returns.manage')}}"
+        }
+      },
+      {
+        "name": "can_inventory_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_inventory_view",
+          "value": "{{permissions.contains('inventory.view') || permissions.contains('inventory.manage')}}"
+        }
+      },
+      {
+        "name": "can_reports_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_reports_view",
+          "value": "{{permissions.contains('reports.view') || permissions.contains('reports.export')}}"
+        }
+      },
+      {
+        "name": "can_admin_access",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_admin_access",
+          "value": "{{permissions.contains('admin.access')}}"
+        }
+      },
+      {
+        "name": "can_districts_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_districts_view",
+          "value": "{{permissions.contains('districts.view')}}"
+        }
+      },
+      {
+        "name": "can_districts_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_districts_manage",
+          "value": "{{permissions.contains('districts.manage')}}"
+        }
+      },
+      {
+        "name": "can_schools_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_schools_view",
+          "value": "{{permissions.contains('schools.view')}}"
+        }
+      },
+      {
+        "name": "can_schools_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_schools_manage",
+          "value": "{{permissions.contains('schools.manage')}}"
+        }
+      },
+      {
+        "name": "can_user_scopes_view",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_user_scopes_view",
+          "value": "{{permissions.contains('user_scopes.view')}}"
+        }
+      },
+      {
+        "name": "can_user_scopes_manage",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_user_scopes_manage",
+          "value": "{{permissions.contains('user_scopes.manage')}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_users_view",
+          "value": "{{is_super_admin && permissions.contains('users.view')}}"
+        },
+        "name": "can_users_view"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_users_create",
+          "value": "{{is_super_admin && permissions.contains('users.create')}}"
+        },
+        "name": "can_users_create"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_users_update",
+          "value": "{{is_super_admin && permissions.contains('users.update')}}"
+        },
+        "name": "can_users_update"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_users_disable",
+          "value": "{{is_super_admin && permissions.contains('users.disable')}}"
+        },
+        "name": "can_users_disable"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "can_security_groups_view",
+          "value": "{{is_super_admin && permissions.contains('roles.view')}}"
+        },
+        "name": "can_security_groups_view"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "authenticated": true,
+            "user": "{{user}}",
+            "roles": "{{roles}}",
+            "permissions": "{{permissions}}",
+            "is_super_admin": "{{is_super_admin}}",
+            "can_dashboard_view": "{{can_dashboard_view}}",
+            "can_devices_view": "{{can_devices_view}}",
+            "can_devices_manage": "{{can_devices_manage}}",
+            "can_device_imports_view": "{{can_device_imports_view}}",
+            "can_device_imports_manage": "{{can_device_imports_manage}}",
+            "can_device_district_allocations_view": "{{can_device_district_allocations_view}}",
+            "can_device_district_allocations_manage": "{{can_device_district_allocations_manage}}",
+            "can_device_school_allocations_view": "{{can_device_school_allocations_view}}",
+            "can_device_school_allocations_manage": "{{can_device_school_allocations_manage}}",
+            "can_device_student_assignments_view": "{{can_device_student_assignments_view}}",
+            "can_device_student_assignments_manage": "{{can_device_student_assignments_manage}}",
+            "can_device_student_returns_manage": "{{can_device_student_returns_manage}}",
+            "can_device_school_returns_manage": "{{can_device_school_returns_manage}}",
+            "can_device_district_returns_manage": "{{can_device_district_returns_manage}}",
+            "can_students_view": "{{can_students_view}}",
+            "can_students_manage": "{{can_students_manage}}",
+            "can_tickets_view": "{{can_tickets_view}}",
+            "can_logistics_view": "{{can_logistics_view}}",
+            "can_logistics_request_pickup": "{{can_logistics_request_pickup}}",
+            "can_logistics_accept": "{{can_logistics_accept}}",
+            "can_logistics_dispatch": "{{can_logistics_dispatch}}",
+            "can_logistics_receive": "{{can_logistics_receive}}",
+            "can_logistics_forward_to_repair": "{{can_logistics_forward_to_repair}}",
+            "can_logistics_repair_receive": "{{can_logistics_repair_receive}}",
+            "can_logistics_return_dispatch": "{{can_logistics_return_dispatch}}",
+            "can_logistics_return_ttpost_receive": "{{can_logistics_return_ttpost_receive}}",
+            "can_logistics_return_school_dispatch": "{{can_logistics_return_school_dispatch}}",
+            "can_logistics_return_school_receive": "{{can_logistics_return_school_receive}}",
+            "can_logistics_locations_manage": "{{can_logistics_locations_manage}}",
+            "can_tickets_dashboard": "{{can_tickets_dashboard}}",
+            "can_tickets_report": "{{can_tickets_report}}",
+            "can_tickets_create": "{{can_tickets_create}}",
+            "can_tickets_diagnose": "{{can_tickets_diagnose}}",
+            "can_tickets_clarification_request": "{{can_tickets_clarification_request}}",
+            "can_tickets_clarification_respond": "{{can_tickets_clarification_respond}}",
+            "can_tickets_approve_pickup": "{{can_tickets_approve_pickup}}",
+            "can_tickets_assign": "{{can_tickets_assign}}",
+            "can_tickets_claim": "{{can_tickets_claim}}",
+            "can_collections_view": "{{can_collections_view}}",
+            "can_repairs_view": "{{can_repairs_view}}",
+            "can_repairs_start": "{{can_repairs_start}}",
+            "can_repairs_assess": "{{can_repairs_assess}}",
+            "can_repairs_record_work": "{{can_repairs_record_work}}",
+            "can_repairs_complete": "{{can_repairs_complete}}",
+            "can_exceptions_view": "{{can_exceptions_view}}",
+            "can_exceptions_assess": "{{can_exceptions_assess}}",
+            "can_exceptions_submit": "{{can_exceptions_submit}}",
+            "can_exceptions_district_decide": "{{can_exceptions_district_decide}}",
+            "can_exceptions_head_office_approve": "{{can_exceptions_head_office_approve}}",
+            "can_manufacturer_returns_view": "{{can_manufacturer_returns_view}}",
+            "can_manufacturer_returns_start": "{{can_manufacturer_returns_start}}",
+            "can_manufacturer_returns_prepare_outbound": "{{can_manufacturer_returns_prepare_outbound}}",
+            "can_manufacturer_returns_external_outbound_pickup": "{{can_manufacturer_returns_external_outbound_pickup}}",
+            "can_manufacturer_returns_ttpost_outbound_pickup": "{{can_manufacturer_returns_ttpost_outbound_pickup}}",
+            "can_manufacturer_returns_manufacturer_acknowledge": "{{can_manufacturer_returns_manufacturer_acknowledge}}",
+            "can_manufacturer_returns_record_outcome": "{{can_manufacturer_returns_record_outcome}}",
+            "can_manufacturer_returns_prepare_return": "{{can_manufacturer_returns_prepare_return}}",
+            "can_manufacturer_returns_external_return_pickup": "{{can_manufacturer_returns_external_return_pickup}}",
+            "can_manufacturer_returns_ttpost_return_pickup": "{{can_manufacturer_returns_ttpost_return_pickup}}",
+            "can_manufacturer_returns_repair_receive": "{{can_manufacturer_returns_repair_receive}}",
+            "can_carriers_view": "{{can_carriers_view}}",
+            "can_carriers_manage": "{{can_carriers_manage}}",
+            "can_sla_view": "{{can_sla_view}}",
+            "can_escalations_view": "{{can_escalations_view}}",
+            "can_escalations_manage": "{{can_escalations_manage}}",
+            "can_escalations_respond": "{{can_escalations_respond}}",
+            "can_notifications_view": "{{can_notifications_view}}",
+            "can_notifications_respond": "{{can_notifications_respond}}",
+            "can_notifications_manage": "{{can_notifications_manage}}",
+            "can_sla_manage": "{{can_sla_manage}}",
+            "can_device_stock_view": "{{can_device_stock_view}}",
+            "can_device_stock_intake": "{{can_device_stock_intake}}",
+            "can_device_stock_release": "{{can_device_stock_release}}",
+            "can_replacements_view": "{{can_replacements_view}}",
+            "can_replacements_start": "{{can_replacements_start}}",
+            "can_replacements_select": "{{can_replacements_select}}",
+            "can_replacements_accept": "{{can_replacements_accept}}",
+            "can_temporary_loans_view": "{{can_temporary_loans_view}}",
+            "can_temporary_loans_request": "{{can_temporary_loans_request}}",
+            "can_temporary_loans_authorize": "{{can_temporary_loans_authorize}}",
+            "can_temporary_loans_cancel": "{{can_temporary_loans_cancel}}",
+            "can_temporary_loans_select_spare": "{{can_temporary_loans_select_spare}}",
+            "can_temporary_loans_issue": "{{can_temporary_loans_issue}}",
+            "can_temporary_loans_request_return": "{{can_temporary_loans_request_return}}",
+            "can_temporary_loans_reclaim": "{{can_temporary_loans_reclaim}}",
+            "can_temporary_loans_request_conversion": "{{can_temporary_loans_request_conversion}}",
+            "can_temporary_loans_approve_conversion": "{{can_temporary_loans_approve_conversion}}",
+            "can_returns_view": "{{can_returns_view}}",
+            "can_inventory_view": "{{can_inventory_view}}",
+            "can_reports_view": "{{can_reports_view}}",
+            "can_admin_access": "{{can_admin_access}}",
+            "can_districts_view": "{{can_districts_view}}",
+            "can_districts_manage": "{{can_districts_manage}}",
+            "can_schools_view": "{{can_schools_view}}",
+            "can_schools_manage": "{{can_schools_manage}}",
+            "can_user_scopes_view": "{{can_user_scopes_view}}",
+            "can_user_scopes_manage": "{{can_user_scopes_manage}}",
+            "can_users_view": "{{can_users_view}}",
+            "can_users_create": "{{can_users_create}}",
+            "can_users_update": "{{can_users_update}}",
+            "can_users_disable": "{{can_users_disable}}",
+            "can_security_groups_view": "{{can_security_groups_view}}",
+            "can_spare_pools_view": "{{can_spare_pools_view}}",
+            "can_spare_pools_manage": "{{can_spare_pools_manage}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "An unexpected server error occurred."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

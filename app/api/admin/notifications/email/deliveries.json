@@ -1,0 +1,30 @@
+{
+  "exec": {
+    "steps": [
+      { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.manage" } } },
+      { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+      { "name": "rows", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+        "table": { "name": "notification_deliveries", "alias": "d" },
+        "columns": [
+          { "table": "d", "column": "id" }, { "table": "d", "column": "delivery_number" },
+          { "table": "d", "column": "notification_event_id" }, { "table": "d", "column": "notification_recipient_id" },
+          { "table": "d", "column": "user_id" }, { "table": "u", "column": "username", "alias": "recipient_username" },
+          { "table": "d", "column": "recipient_address" }, { "table": "d", "column": "channel_code" },
+          { "table": "e", "column": "event_type_code" }, { "table": "d", "column": "subject_snapshot" },
+          { "table": "d", "column": "status_code" }, { "table": "d", "column": "attempt_count" },
+          { "table": "d", "column": "max_attempts" }, { "table": "d", "column": "next_attempt_at" },
+          { "table": "d", "column": "last_attempt_at" }, { "table": "d", "column": "sent_at" },
+          { "table": "d", "column": "created_at" }, { "table": "d", "column": "last_error_code" },
+          { "table": "d", "column": "last_error_message" }
+        ],
+        "joins": [
+          { "table": "users", "alias": "u", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "d", "column": "user_id" } }] } },
+          { "table": "notification_events", "alias": "e", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "e", "column": "id", "operation": "=", "value": { "table": "d", "column": "notification_event_id" } }] } }
+        ],
+        "orders": [{ "table": "d", "column": "created_at", "direction": "desc" }],
+        "limit": 200
+      } } }
+    ],
+    "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Email delivery records could not be loaded." } } }]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "exec": {
+    "steps": [
+      { "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{$_PARAM.actor_user_id || null}}" }, { "column": "action", "value": "notification_delivery_failed" }, { "column": "module", "value": "notifications" }, { "column": "entity_type", "value": "escalation_case" }, { "column": "entity_id", "value": "{{$_PARAM.escalation_case_id}}" }, { "column": "description", "value": "The SLA/escalation transition committed, but its derived notification could not be created." }] } } }
+    ],
+    "catch": [
+      { "module": "core", "action": "setvalue", "options": { "key": "notification_failure_audit_unavailable", "value": true } }
+    ]
+  }
+}

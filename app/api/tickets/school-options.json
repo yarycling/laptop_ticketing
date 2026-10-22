@@ -1,0 +1,22 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "district_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "tickets.view" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "name": "schools", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "schools", "alias": "s" },
+      "columns": [{ "table": "s", "column": "id" }, { "table": "s", "column": "name" }, { "table": "s", "column": "school_code" }, { "table": "s", "column": "district_id" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "s", "column": "status" }, "operation": "=", "value": "active" },
+        { "condition": "AND", "conditional": "{{$_GET.district_id}}", "rules": [{ "data": { "table": "s", "column": "district_id" }, "operation": "=", "value": "{{$_GET.district_id}}" }] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "s", "column": "id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "s", "column": "district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "s", "column": "id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] }
+        ] }
+      ] }, "orders": [{ "table": "s", "column": "name", "direction": "asc" }]
+    } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "schools": "{{schools}}" } } }
+  ], "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "School options could not be loaded." } } }] } }
+}

@@ -1,0 +1,9 @@
+{
+  "settings": { "options": { "method": "post" } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "sla.manage" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "evaluation", "module": "core", "action": "exec", "output": true, "options": { "exec": "sla_evaluate", "params": {} } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "examined": "{{evaluation.evaluated_count}}", "evaluation_time": "{{evaluation.evaluation_at}}", "timezone_configuration_error_count": "{{evaluation.timezone_configuration_error_count}}", "timezone_errors": "{{evaluation.timezone_errors}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "SLA evaluation could not be completed." } } }] }
+}

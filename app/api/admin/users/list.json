@@ -1,0 +1,394 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_super_admin",
+          "params": {}
+        },
+        "name": "admin_only"
+      },
+      {
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "users.view"
+          }
+        },
+        "name": "permission"
+      },
+      {
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        },
+        "name": "identity"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "page",
+          "value": "{{$_GET.page > 0 && $_GET.page <= 100000 ? $_GET.page.toNumber().floor() : 1}}"
+        },
+        "name": "page"
+      },
+      {
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": []
+          }
+        },
+        "name": "total_users"
+      },
+      {
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": [],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "display_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "username"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "email"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.search}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.status}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "role_codes"
+                      },
+                      "operator": "contains",
+                      "value": "{{'|' + $_GET.role + '|'}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.role}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "district_ids"
+                      },
+                      "operator": "contains",
+                      "value": "{{'|' + $_GET.district_id + '|'}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.district_id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "total"
+      },
+      {
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": [],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": { "column": "status" },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        "name": "active_users"
+      },
+      {
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": [],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": { "column": "role_codes" },
+                  "operator": "contains",
+                  "value": "|SUPER_ADMIN|"
+                }
+              ]
+            }
+          }
+        },
+        "name": "global_users"
+      },
+      {
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_security_groups",
+            "columns": [],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": { "column": "assignable" },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "name": "security_groups"
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_user_directory",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "username"
+              },
+              {
+                "column": "email"
+              },
+              {
+                "column": "display_name"
+              },
+              {
+                "column": "status"
+              },
+              {
+                "column": "last_login_at"
+              },
+              {
+                "column": "password_changed_at"
+              },
+              {
+                "column": "created_at"
+              },
+              {
+                "column": "updated_at"
+              },
+              {
+                "column": "security_groups"
+              },
+              {
+                "column": "scope_summary"
+              }
+            ],
+            "limit": 25,
+            "offset": "{{(page - 1) * 25}}",
+            "orders": [
+              {
+                "column": "display_name",
+                "direction": "asc"
+              },
+              {
+                "column": "id",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "condition": "OR",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "display_name"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "username"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    },
+                    {
+                      "data": {
+                        "column": "email"
+                      },
+                      "operator": "contains",
+                      "value": "{{$_GET.search}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.search}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "status"
+                      },
+                      "operation": "=",
+                      "value": "{{$_GET.status}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.status}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "role_codes"
+                      },
+                      "operator": "contains",
+                      "value": "{{'|' + $_GET.role + '|'}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.role}}"
+                },
+                {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "data": {
+                        "column": "district_ids"
+                      },
+                      "operator": "contains",
+                      "value": "{{'|' + $_GET.district_id + '|'}}"
+                    }
+                  ],
+                  "conditional": "{{$_GET.district_id}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "users"
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "users": "{{users}}",
+            "total": "{{total}}",
+            "total_users": "{{total_users}}",
+            "active_users": "{{active_users}}",
+            "global_users": "{{global_users}}",
+            "security_groups": "{{security_groups}}",
+            "page": "{{page}}",
+            "page_size": 25
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 400,
+          "data": {
+            "success": false,
+            "error": "{{admin_error || 'The operation could not be completed. Check the supplied values and try again.'}}"
+          }
+        }
+      }
+    ]
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "search",
+        "type": "text"
+      },
+      {
+        "name": "role",
+        "type": "text"
+      },
+      {
+        "name": "status",
+        "type": "text"
+      },
+      {
+        "name": "district_id",
+        "type": "text"
+      },
+      {
+        "name": "page",
+        "type": "text"
+      }
+    ]
+  }
+}

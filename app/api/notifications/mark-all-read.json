@@ -1,0 +1,12 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.respond" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "mark_all_transaction", "module": "dbupdater", "action": "transaction", "output": true, "options": { "connection": "db", "exec": { "steps": [
+      { "name": "mark_all", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "v_notification_unread_recipients", "values": [{ "column": "read_at", "value": "{{'now'.formatDate('yyyy-MM-dd HH:mm:ss')}}" }, { "column": "read_by", "value": "{{identity}}" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "user_id" }, "operation": "=", "value": "{{identity}}" }] } } } },
+      { "module": "core", "action": "condition", "options": { "if": "{{mark_all.affected > 0}}", "then": { "steps": [{ "module": "dbupdater", "action": "insert", "options": { "connection": "db", "sql": { "table": "audit_logs", "values": [{ "column": "actor_user_id", "value": "{{identity}}" }, { "column": "action", "value": "notifications_marked_all_read" }, { "column": "module", "value": "notifications" }, { "column": "entity_type", "value": "notification_recipient" }, { "column": "entity_id", "value": null }, { "column": "description", "value": "Marked all own unread notifications as read." }] } } }] } } }
+    ] } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "marked_count": "{{mark_all.affected}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Notifications could not be marked read." } } }] }
+}

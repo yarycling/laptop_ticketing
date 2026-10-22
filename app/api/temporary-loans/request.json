@@ -1,0 +1,480 @@
+{
+  "meta": {
+    "$_POST": [
+      {
+        "name": "ticket_id",
+        "type": "number"
+      },
+      {
+        "name": "request_notes",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.request"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.ticket_id || $_POST.ticket_id < 1 || ($_POST.request_notes && $_POST.request_notes.length > 1000)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid ticket and notes of at most 1000 characters are required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "request_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "v_temporary_loan_request_context",
+                    "columns": [
+                      {
+                        "column": "ticket_id"
+                      },
+                      {
+                        "column": "original_device_id"
+                      },
+                      {
+                        "column": "origin_district_id"
+                      },
+                      {
+                        "column": "origin_school_id"
+                      },
+                      {
+                        "column": "repair_service_location_id"
+                      },
+                      {
+                        "column": "repair_job_id"
+                      },
+                      {
+                        "column": "spare_pool_id"
+                      },
+                      {
+                        "column": "original_lifecycle_code"
+                      },
+                      {
+                        "column": "can_request"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "ticket_id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.ticket_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.ticket_id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_REQUEST_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "location_scope",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_service_location_scopes",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "service_location_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.repair_service_location_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !location_scope.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_REQUEST_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{current.can_request != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_REQUEST_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "new_loan",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_cases",
+                    "values": [
+                      {
+                        "column": "ticket_id",
+                        "value": "{{current.ticket_id}}"
+                      },
+                      {
+                        "column": "repair_job_id",
+                        "value": "{{current.repair_job_id}}"
+                      },
+                      {
+                        "column": "original_device_id",
+                        "value": "{{current.original_device_id}}"
+                      },
+                      {
+                        "column": "origin_district_id",
+                        "value": "{{current.origin_district_id}}"
+                      },
+                      {
+                        "column": "origin_school_id",
+                        "value": "{{current.origin_school_id || null}}"
+                      },
+                      {
+                        "column": "repair_service_location_id",
+                        "value": "{{current.repair_service_location_id}}"
+                      },
+                      {
+                        "column": "spare_pool_id",
+                        "value": "{{current.spare_pool_id}}"
+                      },
+                      {
+                        "column": "current_status_code",
+                        "value": "PENDING_DISTRICT_APPROVAL"
+                      },
+                      {
+                        "column": "requested_by",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "request_reason_code",
+                        "value": "{{current.original_lifecycle_code == 'MANUFACTURER_RETURN' ? 'MANUFACTURER_RETURN' : 'REPAIR_UNAVAILABLE'}}"
+                      },
+                      {
+                        "column": "request_notes",
+                        "value": "{{$_POST.request_notes || null}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": 1
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "number",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_cases",
+                    "values": [
+                      {
+                        "column": "loan_number",
+                        "value": "{{'TL' + new_loan.identity}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{new_loan.identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "loan_number"
+                          },
+                          "operator": "is_null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{number.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_REQUEST_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "history",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_status_history",
+                    "values": [
+                      {
+                        "column": "temporary_loan_case_id",
+                        "value": "{{new_loan.identity}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": null
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "PENDING_DISTRICT_APPROVAL"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "Temporary spare authorization requested."
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "temporary_loan_requested"
+                      },
+                      {
+                        "column": "module",
+                        "value": "temporary_loans"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "temporary_loan_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{new_loan.identity}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "Temporary spare authorization requested."
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "temporary_loan_case_id": "{{new_loan.identity}}",
+            "loan_number": "{{'TL' + new_loan.identity}}",
+            "status": "PENDING_DISTRICT_APPROVAL"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_REQUEST_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_REQUEST_STATE' || $_EXCEPTION.code == 'ER_DUP_ENTRY'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "This ticket is not eligible for a temporary spare request or an active loan already exists."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Temporary spare request could not be saved. No partial changes were committed."
+          }
+        }
+      }
+    ]
+  }
+}

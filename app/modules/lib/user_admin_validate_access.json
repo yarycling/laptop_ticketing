@@ -1,0 +1,531 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "admin_security_groups",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "name"
+              },
+              {
+                "column": "label"
+              },
+              {
+                "column": "scope_type"
+              }
+            ],
+            "orders": [
+              {
+                "column": "name",
+                "direction": "asc"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "name"
+                  },
+                  "operator": "in",
+                  "value": "{{role_codes}}"
+                },
+                {
+                  "data": {
+                    "column": "assignable"
+                  },
+                  "operation": "=",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "name": "new_roles"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!role_codes.count() || new_roles.count() != role_codes.count()}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Select valid, assignable security groups."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "global_access",
+          "value": "{{new_roles.where('scope_type','==','GLOBAL').count() > 0}}"
+        },
+        "name": "global_access"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "national_access",
+          "value": "{{!global_access && new_roles.where('scope_type','==','NATIONAL').count() > 0}}"
+        },
+        "name": "national_access"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "district_required",
+          "value": "{{!global_access && !national_access && new_roles.where('scope_type','==','DISTRICT').count() > 0}}"
+        },
+        "name": "district_required"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_required",
+          "value": "{{!global_access && !national_access && new_roles.where('scope_type','==','SCHOOL').count() > 0}}"
+        },
+        "name": "school_required"
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "location_required",
+          "value": "{{!global_access && new_roles.where('scope_type','==','REPAIR_LOCATION').count() > 0}}"
+        },
+        "name": "location_required"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{(district_required && !district_ids.count()) || (!district_required && district_ids.count())}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Select district scope only for district security groups."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{(school_required && !school_ids.count()) || (!school_required && school_ids.count())}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Select school scope only for school security groups."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{(location_required && !service_location_ids.count()) || (!location_required && service_location_ids.count())}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Select repair-centre locations only for repair security groups."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "districts",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operator": "in",
+                  "value": "{{district_ids}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        "name": "valid_districts"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{valid_districts.count() != district_ids.count()}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Invalid or inactive districts, or school outside selected districts."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "schools",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operator": "in",
+                  "value": "{{school_ids}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                },
+                {
+                  "data": {
+                    "column": "district_id"
+                  },
+                  "operator": "in",
+                  "value": "{{school_district_ids}}"
+                }
+              ]
+            }
+          }
+        },
+        "name": "valid_schools"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{valid_schools.count() != school_ids.count()}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Invalid or inactive schools, or school outside selected districts."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "service_locations",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operator": "in",
+                  "value": "{{service_location_ids}}"
+                },
+                {
+                  "data": {
+                    "column": "is_active"
+                  },
+                  "operation": "=",
+                  "value": 1
+                },
+                {
+                  "data": {
+                    "column": "location_type"
+                  },
+                  "operation": "=",
+                  "value": "REPAIR_CENTRE"
+                }
+              ]
+            }
+          }
+        },
+        "name": "valid_locations"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{valid_locations.count() != service_location_ids.count()}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Invalid or inactive locations, or school outside selected districts."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "dbconnector",
+        "action": "select",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "districts",
+            "columns": [
+              {
+                "column": "id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operator": "in",
+                  "value": "{{school_district_ids}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        "name": "valid_school_districts"
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{valid_school_districts.count() != school_district_ids.count()}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "admin_error",
+                  "value": "Invalid or inactive school district."
+                },
+                "name": "admin_error"
+              },
+              {
+                "module": "core",
+                "action": "error",
+                "options": {
+                  "message": "USER_ADMIN_VALIDATION"
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "new_roles",
+          "value": "{{new_roles}}"
+        },
+        "name": "new_roles",
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "global_access",
+          "value": "{{global_access}}"
+        },
+        "name": "global_access",
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "national_access",
+          "value": "{{national_access}}"
+        },
+        "name": "national_access",
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "district_required",
+          "value": "{{district_required}}"
+        },
+        "name": "district_required",
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_required",
+          "value": "{{school_required}}"
+        },
+        "name": "school_required",
+        "output": true
+      },
+      {
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "location_required",
+          "value": "{{location_required}}"
+        },
+        "name": "location_required",
+        "output": true
+      }
+    ]
+  }
+}

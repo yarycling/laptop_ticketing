@@ -1,0 +1,15 @@
+{
+  "settings": { "options": { "method": "post", "nocsrf": true } },
+  "meta": { "$_POST": [{ "name": "delivery_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.manage" } } },
+    { "name": "identity", "module": "auth", "action": "identify", "options": { "provider": "portalSecurity" } },
+    { "name": "delivery", "module": "dbconnector", "action": "single", "output": true, "options": { "connection": "db", "sql": { "table": "notification_deliveries", "columns": [{ "column": "id" }, { "column": "attempt_count" }, { "column": "status_code" }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{$_POST.delivery_id}}" }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{!delivery.id || !['RETRY_PENDING','FAILED_PERMANENT'].contains(delivery.status_code)}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "Only retry-pending or permanently failed deliveries can be manually retried." } } }] } } },
+    { "name": "manual_retry", "module": "dbupdater", "action": "update", "output": true, "options": { "connection": "db", "sql": { "table": "notification_deliveries", "values": [{ "column": "status_code", "value": "PENDING" }, { "column": "max_attempts", "value": "{{delivery.attempt_count + 1}}" }, { "column": "next_attempt_at", "value": null }, { "column": "last_error_code", "value": null }, { "column": "last_error_message", "value": null }], "wheres": { "condition": "AND", "rules": [{ "data": { "column": "id" }, "operation": "=", "value": "{{delivery.id}}" }, { "data": { "column": "status_code" }, "operation": "in", "value": ["RETRY_PENDING", "FAILED_PERMANENT"] }] } } } },
+    { "module": "core", "action": "condition", "options": { "if": "{{manual_retry.affected != 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 409, "data": { "success": false, "error": "The delivery state changed; reload before retrying." } } }] } } },
+    { "name": "audit", "module": "core", "action": "exec", "options": { "exec": "notification_email_audit", "params": { "delivery_id": "{{delivery.id}}", "actor_user_id": "{{identity}}", "action": "EMAIL_DELIVERY_MANUAL_RETRY", "description": "A notifications manager manually retried an existing email delivery." } } },
+    { "name": "send", "module": "core", "action": "exec", "output": true, "options": { "exec": "notification_email_send", "params": { "delivery_id": "{{delivery.id}}", "actor_user_id": "{{identity}}" } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "delivery_id": "{{delivery.id}}", "send_claimed": "{{send.email_send_claimed}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Email delivery retry could not be completed." } } }] }
+}

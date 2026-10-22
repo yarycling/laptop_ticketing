@@ -1,0 +1,29 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [
+    { "name": "search", "type": "text" },
+    { "name": "page", "type": "number" },
+    { "name": "page_size", "type": "number" }
+  ] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "logistics.locations_manage" } }, "output": true },
+    { "name": "page", "module": "core", "action": "setvalue", "options": { "key": "page", "value": "{{$_GET.page && $_GET.page > 0 ? floor($_GET.page) : 1}}" } },
+    { "name": "page_size", "module": "core", "action": "setvalue", "options": { "key": "page_size", "value": "{{!$_GET.page_size || $_GET.page_size < 1 ? 10 : ($_GET.page_size > 50 ? 50 : floor($_GET.page_size))}}" } },
+    { "name": "all_total", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "columns": [] } } },
+    { "name": "total", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "wheres": { "condition": "AND", "rules": [{ "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [
+      { "data": { "column": "location_type" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "data": { "column": "code" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "data": { "column": "name" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "condition": "AND", "rules": [ { "data": { "column": "location_type" }, "operation": "=", "value": "{{$_GET.search == 'TTPost' ? 'TTPOST' : ($_GET.search == 'Repair Centre' ? 'REPAIR_CENTRE' : '')}}" } ], "conditional": "{{$_GET.search == 'TTPost' || $_GET.search == 'Repair Centre'}}" }
+    ] }] } } } },
+    { "name": "active_tpost", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "wheres": { "condition": "AND", "rules": [ { "data": { "column": "location_type" }, "operation": "=", "value": "TTPOST" }, { "data": { "column": "is_active" }, "operation": "=", "value": 1 } ] } } } },
+    { "name": "active_repair_centres", "module": "dbconnector", "action": "count", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "wheres": { "condition": "AND", "rules": [ { "data": { "column": "location_type" }, "operation": "=", "value": "REPAIR_CENTRE" }, { "data": { "column": "is_active" }, "operation": "=", "value": 1 } ] } } } },
+    { "name": "locations", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": "service_locations", "columns": [ { "column": "id" }, { "column": "location_type" }, { "column": "code" }, { "column": "name" }, { "column": "is_active" }, { "column": "created_at" }, { "column": "updated_at" } ], "wheres": { "condition": "AND", "rules": [{ "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [
+      { "data": { "column": "location_type" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "data": { "column": "code" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "data": { "column": "name" }, "operator": "contains", "value": "{{$_GET.search}}" },
+      { "condition": "AND", "rules": [ { "data": { "column": "location_type" }, "operation": "=", "value": "{{$_GET.search == 'TTPost' ? 'TTPOST' : ($_GET.search == 'Repair Centre' ? 'REPAIR_CENTRE' : '')}}" } ], "conditional": "{{$_GET.search == 'TTPost' || $_GET.search == 'Repair Centre'}}" }
+    ] }] }, "orders": [ { "column": "location_type", "direction": "asc" }, { "column": "name", "direction": "asc" } ], "limit": "{{page_size}}", "offset": "{{(page - 1) * page_size}}" } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "locations": "{{locations}}", "page": "{{page}}", "page_size": "{{page_size}}", "total": "{{total}}", "all_total": "{{all_total}}", "total_pages": "{{ceil(total / page_size)}}", "active_tpost": "{{active_tpost}}", "active_repair_centres": "{{active_repair_centres}}" } } }
+  ], "catch": { "steps": [ { "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Logistics locations could not be loaded." } } } ] } }
+}

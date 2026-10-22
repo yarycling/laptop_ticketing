@@ -1,0 +1,401 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "tickets.view"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        },
+        "output": true
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid ticket ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "ticket",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "tickets",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "origin_district_id"
+              },
+              {
+                "column": "origin_school_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!ticket.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Ticket was not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "repair_scope",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": { "connection": "db", "sql": {
+          "table": "v_logistics_case_detail_context",
+          "columns": [{ "column": "ticket_id" }, { "column": "repair_centre_location_id" }],
+          "wheres": { "condition": "AND", "rules": [{ "data": { "column": "ticket_id" }, "operation": "=", "value": "{{ticket.id}}" }] }
+        } }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(ticket.origin_district_id) && !scope_context.schools.flatten('id').contains(ticket.origin_school_id) && !scope_context.service_locations.flatten('id').contains(repair_scope.repair_centre_location_id)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "activity",
+        "module": "dbconnector",
+        "action": "select",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": {
+              "name": "v_ticket_activity_08d_e",
+              "alias": "a"
+            },
+            "columns": [
+              {
+                "table": "a",
+                "column": "ticket_id"
+              },
+              {
+                "table": "a",
+                "column": "activity_at"
+              },
+              {
+                "table": "a",
+                "column": "activity_type"
+              },
+              {
+                "table": "a",
+                "column": "activity_code"
+              },
+              {
+                "table": "a",
+                "column": "related_record_id"
+              },
+              {
+                "table": "a",
+                "column": "reference_code"
+              },
+              {
+                "table": "a",
+                "column": "activity_sort_order"
+              },
+              {
+                "table": "a",
+                "column": "actor_user_id"
+              },
+              {
+                "table": "actor",
+                "column": "display_name",
+                "alias": "actor_display_name"
+              },
+              {
+                "table": "a",
+                "column": "subject_user_id"
+              },
+              {
+                "table": "subject",
+                "column": "display_name",
+                "alias": "subject_display_name"
+              },
+              {
+                "table": "from_status",
+                "column": "code",
+                "alias": "from_status_code"
+              },
+              {
+                "table": "from_status",
+                "column": "name",
+                "alias": "from_status_name"
+              },
+              {
+                "table": "to_status",
+                "column": "code",
+                "alias": "to_status_code"
+              },
+              {
+                "table": "to_status",
+                "column": "name",
+                "alias": "to_status_name"
+              }
+            ],
+            "joins": [
+              {
+                "table": "users",
+                "alias": "actor",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "actor",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "actor_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "users",
+                "alias": "subject",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "subject",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "subject_user_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "ticket_statuses",
+                "alias": "from_status",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "from_status",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "from_status_id"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "table": "ticket_statuses",
+                "alias": "to_status",
+                "type": "left",
+                "clauses": {
+                  "condition": "AND",
+                  "rules": [
+                    {
+                      "table": "to_status",
+                      "column": "id",
+                      "operation": "=",
+                      "value": {
+                        "table": "a",
+                        "column": "to_status_id"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "table": "a",
+                    "column": "ticket_id"
+                  },
+                  "operation": "=",
+                  "value": "{{ticket.id}}"
+                }
+              ]
+            },
+            "orders": [
+              {
+                "table": "a",
+                "column": "activity_at",
+                "direction": "asc"
+              },
+              {
+                "table": "a",
+                "column": "activity_sort_order",
+                "direction": "asc"
+              },
+              {
+                "table": "a",
+                "column": "related_record_id",
+                "direction": "asc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "display_activity",
+        "module": "core",
+        "action": "repeat",
+        "options": {
+          "repeat": "{{activity}}",
+          "outputFilter": "exclude",
+          "outputFields": [],
+          "exec": {
+            "steps": [
+              {
+                "name": "activity_at_display",
+                "module": "core",
+                "action": "setvalue",
+                "options": {
+                  "key": "activity_at_display",
+                  "value": "{{activity_at ? activity_at.formatDate('MMMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                },
+                "output": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "activity": "{{display_activity}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Ticket activity could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

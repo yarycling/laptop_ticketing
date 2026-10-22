@@ -1,0 +1,9 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "user_id", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "notifications.manage" } } },
+    { "name": "rows", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": { "table": { "name": "v_notification_inbox", "alias": "n" }, "columns": [{ "table": "n", "column": "recipient_id" }, { "table": "n", "column": "notification_event_id" }, { "table": "n", "column": "user_id" }, { "table": "u", "column": "username", "alias": "recipient_username" }, { "table": "n", "column": "event_type_code" }, { "table": "n", "column": "severity_code" }, { "table": "n", "column": "title" }, { "table": "n", "column": "created_at_display" }, { "table": "n", "column": "read_at" }], "joins": [{ "table": "users", "alias": "u", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "u", "column": "id", "operation": "=", "value": { "table": "n", "column": "user_id" } }] } }], "wheres": { "condition": "AND", "rules": [{ "data": { "table": "n", "column": "user_id" }, "operation": "=", "conditional": "{{$_GET.user_id}}", "value": "{{$_GET.user_id}}" }] }, "orders": [{ "table": "n", "column": "created_at", "direction": "desc" }], "limit": 200 } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "notifications": "{{rows}}" } } }
+  ], "catch": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Notification administration records could not be loaded." } } }] }
+}

@@ -1,0 +1,159 @@
+<aside class="portal-sidebar d-none d-lg-flex" aria-label="Primary navigation">
+  <div>
+    <div class="sidebar-brand">
+      <img class="brand-logo sidebar-logo" src="/assets/img/brand/bmobile-logo.png" alt="bmobile">
+    </div>
+    <nav class="sidebar-nav">
+      <dmx-value id="desktopNavGroup" value="<%= ["devices", "students", "device-catalogue", "device-imports"].includes(currentPage) ? 'assets' : ["district-allocation", "school-allocation", "student-assignment"].includes(currentPage) ? 'allocations' : ["logistics", "repairs", "device-stock", "manufacturer-returns", "permanent-replacements", "temporary-loans"].includes(currentPage) ? 'service' : ["ticket-dashboard", "sla-tracking", "escalations", "notifications", "exceptions"].includes(currentPage) ? 'monitoring' : ["users", "security-groups", "administration", "logistics-locations", "carriers", "sla", "escalation-rules"].includes(currentPage) ? 'admin' : '' %>"></dmx-value>
+      <a class="sidebar-link <%= currentPage === 'dashboard' ? 'active' : '' %>" href="/" <%- currentPage === 'dashboard' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_dashboard_view"><i class="fas fa-home" aria-hidden="true"></i><span>Dashboard</span></a>
+      <a class="sidebar-link <%= currentPage === 'tickets' ? 'active' : '' %>" href="/tickets" <%- currentPage === 'tickets' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_tickets_view"><i class="fas fa-ticket-alt" aria-hidden="true"></i><span>Tickets</span></a>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_devices_view) || (authContext.data.can_students_view) || (authContext.data.can_devices_view) || (authContext.data.can_device_imports_view && (authContext.data.is_super_admin || scopeContext.data.has_national_scope))">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["devices", "students", "device-catalogue", "device-imports"].includes(currentPage) ? 'has-active-page' : '' %>" id="desktopNavassetsToggle" aria-controls="desktopNavassetsLinks" dmx-bind:aria-expanded="desktopNavGroup.value == 'assets'" dmx-on:click="desktopNavGroup.setValue(desktopNavGroup.value == 'assets' ? '' : 'assets')">
+          <i class="fas fa-laptop" aria-hidden="true"></i><span>Devices & Students</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="desktopNavassetsLinks" dmx-show="desktopNavGroup.value == 'assets'">
+          <a class="sidebar-link <%= currentPage === 'devices' ? 'active' : '' %>" href="/devices" <%- currentPage === 'devices' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_devices_view"><i class="fas fa-laptop" aria-hidden="true"></i><span>Devices</span></a>
+          <a class="sidebar-link <%= currentPage === 'students' ? 'active' : '' %>" href="/students" <%- currentPage === 'students' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_students_view"><i class="fas fa-user-graduate" aria-hidden="true"></i><span>Students</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-catalogue' ? 'active' : '' %>" href="/admin/device-catalogue" <%- currentPage === 'device-catalogue' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_devices_view"><i class="fas fa-list" aria-hidden="true"></i><span>Device Catalogue</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-imports' ? 'active' : '' %>" href="/admin/device-imports" <%- currentPage === 'device-imports' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_imports_view && (authContext.data.is_super_admin || scopeContext.data.has_national_scope)"><i class="fas fa-file-import" aria-hidden="true"></i><span>Device Imports</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_device_district_allocations_view) || (authContext.data.can_device_school_allocations_view) || (authContext.data.can_device_student_assignments_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["district-allocation", "school-allocation", "student-assignment"].includes(currentPage) ? 'has-active-page' : '' %>" id="desktopNavallocationsToggle" aria-controls="desktopNavallocationsLinks" dmx-bind:aria-expanded="desktopNavGroup.value == 'allocations'" dmx-on:click="desktopNavGroup.setValue(desktopNavGroup.value == 'allocations' ? '' : 'allocations')">
+          <i class="fas fa-share-alt" aria-hidden="true"></i><span>Allocations</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="desktopNavallocationsLinks" dmx-show="desktopNavGroup.value == 'allocations'">
+          <a class="sidebar-link <%= currentPage === 'district-allocation' ? 'active' : '' %>" href="/device-allocations/districts" <%- currentPage === 'district-allocation' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_district_allocations_view"><i class="fas fa-share-alt" aria-hidden="true"></i><span>District Allocation</span></a>
+          <a class="sidebar-link <%= currentPage === 'school-allocation' ? 'active' : '' %>" href="/device-allocations/schools" <%- currentPage === 'school-allocation' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_school_allocations_view"><i class="fas fa-school" aria-hidden="true"></i><span>School Allocation</span></a>
+          <a class="sidebar-link <%= currentPage === 'student-assignment' ? 'active' : '' %>" href="/device-assignments/students" <%- currentPage === 'student-assignment' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_student_assignments_view"><i class="fas fa-user-check" aria-hidden="true"></i><span>Student Assignment</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_logistics_view) || (authContext.data.can_repairs_view) || (authContext.data.can_device_stock_view) || (authContext.data.can_manufacturer_returns_view) || (authContext.data.can_replacements_view) || (authContext.data.can_temporary_loans_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["logistics", "repairs", "device-stock", "manufacturer-returns", "permanent-replacements", "temporary-loans"].includes(currentPage) ? 'has-active-page' : '' %>" id="desktopNavserviceToggle" aria-controls="desktopNavserviceLinks" dmx-bind:aria-expanded="desktopNavGroup.value == 'service'" dmx-on:click="desktopNavGroup.setValue(desktopNavGroup.value == 'service' ? '' : 'service')">
+          <i class="fas fa-tools" aria-hidden="true"></i><span>Repairs & Logistics</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="desktopNavserviceLinks" dmx-show="desktopNavGroup.value == 'service'">
+          <a class="sidebar-link <%= currentPage === 'logistics' ? 'active' : '' %>" href="/logistics" <%- currentPage === 'logistics' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_logistics_view"><i class="fas fa-truck" aria-hidden="true"></i><span>Logistics</span></a>
+          <a class="sidebar-link <%= currentPage === 'repairs' ? 'active' : '' %>" href="/repairs" <%- currentPage === 'repairs' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_repairs_view"><i class="fas fa-tools" aria-hidden="true"></i><span>Repairs</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-stock' ? 'active' : '' %>" href="/device-stock" <%- currentPage === 'device-stock' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_stock_view"><i class="fas fa-warehouse" aria-hidden="true"></i><span>Repair Centre Stock</span></a>
+          <a class="sidebar-link <%= currentPage === 'manufacturer-returns' ? 'active' : '' %>" href="/manufacturer-returns" <%- currentPage === 'manufacturer-returns' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_manufacturer_returns_view"><i class="fas fa-industry" aria-hidden="true"></i><span>Manufacturer Returns</span></a>
+          <a class="sidebar-link <%= currentPage === 'permanent-replacements' ? 'active' : '' %>" href="/permanent-replacements" <%- currentPage === 'permanent-replacements' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_replacements_view"><i class="fas fa-exchange-alt" aria-hidden="true"></i><span>Permanent Replacements</span></a>
+          <a class="sidebar-link <%= currentPage === 'temporary-loans' ? 'active' : '' %>" href="/temporary-loans" <%- currentPage === 'temporary-loans' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_temporary_loans_view"><i class="fas fa-laptop-medical" aria-hidden="true"></i><span>Temporary Loans</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_tickets_dashboard) || (authContext.data.can_sla_view) || (authContext.data.can_escalations_view) || (authContext.data.can_notifications_view) || (authContext.data.can_exceptions_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["ticket-dashboard", "sla-tracking", "escalations", "notifications", "exceptions"].includes(currentPage) ? 'has-active-page' : '' %>" id="desktopNavmonitoringToggle" aria-controls="desktopNavmonitoringLinks" dmx-bind:aria-expanded="desktopNavGroup.value == 'monitoring'" dmx-on:click="desktopNavGroup.setValue(desktopNavGroup.value == 'monitoring' ? '' : 'monitoring')">
+          <i class="fas fa-chart-bar" aria-hidden="true"></i><span>Monitoring & Reports</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="desktopNavmonitoringLinks" dmx-show="desktopNavGroup.value == 'monitoring'">
+          <a class="sidebar-link <%= currentPage === 'ticket-dashboard' ? 'active' : '' %>" href="/tickets/dashboard" <%- currentPage === 'ticket-dashboard' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_tickets_dashboard"><i class="fas fa-chart-bar" aria-hidden="true"></i><span>Ticket Dashboard</span></a>
+          <a class="sidebar-link <%= currentPage === 'sla-tracking' ? 'active' : '' %>" href="/sla" <%- currentPage === 'sla-tracking' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_sla_view"><i class="fas fa-stopwatch" aria-hidden="true"></i><span>SLA Tracking</span></a>
+          <a class="sidebar-link <%= currentPage === 'escalations' ? 'active' : '' %>" href="/escalations" <%- currentPage === 'escalations' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_escalations_view"><i class="fas fa-bell" aria-hidden="true"></i><span>Escalations</span></a>
+          <a class="sidebar-link <%= currentPage === 'notifications' ? 'active' : '' %>" href="/notifications" <%- currentPage === 'notifications' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_notifications_view"><i class="far fa-bell" aria-hidden="true"></i><span>Notifications</span></a>
+          <a class="sidebar-link <%= currentPage === 'exceptions' ? 'active' : '' %>" href="/exceptions" <%- currentPage === 'exceptions' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_exceptions_view"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Exceptions</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_users_view) || (authContext.data.can_security_groups_view) || (authContext.data.can_admin_access) || (authContext.data.can_logistics_locations_manage) || (authContext.data.can_spare_pools_view) || (authContext.data.can_carriers_view) || (authContext.data.can_sla_view) || (authContext.data.can_escalations_manage)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["users", "security-groups", "administration", "logistics-locations", "spare-pools", "carriers", "sla", "escalation-rules"].includes(currentPage) ? 'has-active-page' : '' %>" id="desktopNavadminToggle" aria-controls="desktopNavadminLinks" dmx-bind:aria-expanded="desktopNavGroup.value == 'admin'" dmx-on:click="desktopNavGroup.setValue(desktopNavGroup.value == 'admin' ? '' : 'admin')">
+          <i class="fas fa-cog" aria-hidden="true"></i><span>Administration</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="desktopNavadminLinks" dmx-show="desktopNavGroup.value == 'admin'">
+<a class="sidebar-link <%= currentPage === 'users' ? 'active' : '' %>" href="/admin/users" <%- currentPage === 'users' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_users_view"><i class="fas fa-users" aria-hidden="true"></i><span>Users</span></a>
+<a class="sidebar-link <%= currentPage === 'security-groups' ? 'active' : '' %>" href="/admin/security-groups" <%- currentPage === 'security-groups' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_security_groups_view"><i class="fas fa-user-shield" aria-hidden="true"></i><span>Security Groups</span></a>
+          <a class="sidebar-link <%= currentPage === 'administration' ? 'active' : '' %>" href="/admin/organisation" <%- currentPage === 'administration' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_admin_access"><i class="fas fa-cog" aria-hidden="true"></i><span>Administration</span></a>
+          <a class="sidebar-link <%= currentPage === 'logistics-locations' ? 'active' : '' %>" href="/admin/logistics-locations" <%- currentPage === 'logistics-locations' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_logistics_locations_manage"><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>Logistics Locations</span></a>
+          <a class="sidebar-link <%= currentPage === 'spare-pools' ? 'active' : '' %>" href="/admin/spare-pools" <%- currentPage === 'spare-pools' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_spare_pools_view"><i class="fas fa-boxes" aria-hidden="true"></i><span>Spare Pools</span></a>
+          <a class="sidebar-link <%= currentPage === 'carriers' ? 'active' : '' %>" href="/admin/carriers" <%- currentPage === 'carriers' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_carriers_view"><i class="fas fa-truck" aria-hidden="true"></i><span>Carriers</span></a>
+          <a class="sidebar-link <%= currentPage === 'sla' ? 'active' : '' %>" href="/admin/sla" <%- currentPage === 'sla' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_sla_view"><i class="fas fa-stopwatch" aria-hidden="true"></i><span>SLA Management</span></a>
+          <a class="sidebar-link <%= currentPage === 'escalation-rules' ? 'active' : '' %>" href="/admin/escalations" <%- currentPage === 'escalation-rules' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_escalations_manage"><i class="fas fa-sliders-h" aria-hidden="true"></i><span>Escalation Rules</span></a>
+        </div>
+      </div>
+    </nav>
+  </div>
+  <div class="sidebar-identity">
+    <img class="sidebar-brand-icon" src="/assets/img/brand/bicon.png" alt="" aria-hidden="true">
+    <h2>Laptop Warranty<br>Management Portal</h2>
+    <p>Ministry of Education</p>
+  </div>
+</aside>
+
+<div class="offcanvas offcanvas-start portal-mobile-nav" tabindex="-1" id="portalMobileNav" aria-labelledby="portalMobileNavLabel">
+  <div class="offcanvas-header">
+    <h2 class="offcanvas-title" id="portalMobileNavLabel">Navigation</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close navigation"></button>
+  </div>
+  <div class="offcanvas-body">
+    <img class="brand-logo mobile-nav-logo mb-4" src="/assets/img/brand/bmobile-logo.png" alt="bmobile">
+    <nav class="sidebar-nav">
+      <dmx-value id="mobileNavGroup" value="<%= ["devices", "students", "device-catalogue", "device-imports"].includes(currentPage) ? 'assets' : ["district-allocation", "school-allocation", "student-assignment"].includes(currentPage) ? 'allocations' : ["logistics", "repairs", "device-stock", "manufacturer-returns", "permanent-replacements", "temporary-loans"].includes(currentPage) ? 'service' : ["ticket-dashboard", "sla-tracking", "escalations", "notifications", "exceptions"].includes(currentPage) ? 'monitoring' : ["users", "security-groups", "administration", "logistics-locations", "carriers", "sla", "escalation-rules"].includes(currentPage) ? 'admin' : '' %>"></dmx-value>
+      <a class="sidebar-link <%= currentPage === 'dashboard' ? 'active' : '' %>" href="/" <%- currentPage === 'dashboard' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_dashboard_view"><i class="fas fa-home" aria-hidden="true"></i><span>Dashboard</span></a>
+      <a class="sidebar-link <%= currentPage === 'tickets' ? 'active' : '' %>" href="/tickets" <%- currentPage === 'tickets' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_tickets_view"><i class="fas fa-ticket-alt" aria-hidden="true"></i><span>Tickets</span></a>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_devices_view) || (authContext.data.can_students_view) || (authContext.data.can_devices_view) || (authContext.data.can_device_imports_view && (authContext.data.is_super_admin || scopeContext.data.has_national_scope))">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["devices", "students", "device-catalogue", "device-imports"].includes(currentPage) ? 'has-active-page' : '' %>" id="mobileNavassetsToggle" aria-controls="mobileNavassetsLinks" dmx-bind:aria-expanded="mobileNavGroup.value == 'assets'" dmx-on:click="mobileNavGroup.setValue(mobileNavGroup.value == 'assets' ? '' : 'assets')">
+          <i class="fas fa-laptop" aria-hidden="true"></i><span>Devices & Students</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="mobileNavassetsLinks" dmx-show="mobileNavGroup.value == 'assets'">
+          <a class="sidebar-link <%= currentPage === 'devices' ? 'active' : '' %>" href="/devices" <%- currentPage === 'devices' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_devices_view"><i class="fas fa-laptop" aria-hidden="true"></i><span>Devices</span></a>
+          <a class="sidebar-link <%= currentPage === 'students' ? 'active' : '' %>" href="/students" <%- currentPage === 'students' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_students_view"><i class="fas fa-user-graduate" aria-hidden="true"></i><span>Students</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-catalogue' ? 'active' : '' %>" href="/admin/device-catalogue" <%- currentPage === 'device-catalogue' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_devices_view"><i class="fas fa-list" aria-hidden="true"></i><span>Device Catalogue</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-imports' ? 'active' : '' %>" href="/admin/device-imports" <%- currentPage === 'device-imports' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_imports_view && (authContext.data.is_super_admin || scopeContext.data.has_national_scope)"><i class="fas fa-file-import" aria-hidden="true"></i><span>Device Imports</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_device_district_allocations_view) || (authContext.data.can_device_school_allocations_view) || (authContext.data.can_device_student_assignments_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["district-allocation", "school-allocation", "student-assignment"].includes(currentPage) ? 'has-active-page' : '' %>" id="mobileNavallocationsToggle" aria-controls="mobileNavallocationsLinks" dmx-bind:aria-expanded="mobileNavGroup.value == 'allocations'" dmx-on:click="mobileNavGroup.setValue(mobileNavGroup.value == 'allocations' ? '' : 'allocations')">
+          <i class="fas fa-share-alt" aria-hidden="true"></i><span>Allocations</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="mobileNavallocationsLinks" dmx-show="mobileNavGroup.value == 'allocations'">
+          <a class="sidebar-link <%= currentPage === 'district-allocation' ? 'active' : '' %>" href="/device-allocations/districts" <%- currentPage === 'district-allocation' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_district_allocations_view"><i class="fas fa-share-alt" aria-hidden="true"></i><span>District Allocation</span></a>
+          <a class="sidebar-link <%= currentPage === 'school-allocation' ? 'active' : '' %>" href="/device-allocations/schools" <%- currentPage === 'school-allocation' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_school_allocations_view"><i class="fas fa-school" aria-hidden="true"></i><span>School Allocation</span></a>
+          <a class="sidebar-link <%= currentPage === 'student-assignment' ? 'active' : '' %>" href="/device-assignments/students" <%- currentPage === 'student-assignment' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_student_assignments_view"><i class="fas fa-user-check" aria-hidden="true"></i><span>Student Assignment</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_logistics_view) || (authContext.data.can_repairs_view) || (authContext.data.can_device_stock_view) || (authContext.data.can_manufacturer_returns_view) || (authContext.data.can_replacements_view) || (authContext.data.can_temporary_loans_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["logistics", "repairs", "device-stock", "manufacturer-returns", "permanent-replacements", "temporary-loans"].includes(currentPage) ? 'has-active-page' : '' %>" id="mobileNavserviceToggle" aria-controls="mobileNavserviceLinks" dmx-bind:aria-expanded="mobileNavGroup.value == 'service'" dmx-on:click="mobileNavGroup.setValue(mobileNavGroup.value == 'service' ? '' : 'service')">
+          <i class="fas fa-tools" aria-hidden="true"></i><span>Repairs & Logistics</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="mobileNavserviceLinks" dmx-show="mobileNavGroup.value == 'service'">
+          <a class="sidebar-link <%= currentPage === 'logistics' ? 'active' : '' %>" href="/logistics" <%- currentPage === 'logistics' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_logistics_view"><i class="fas fa-truck" aria-hidden="true"></i><span>Logistics</span></a>
+          <a class="sidebar-link <%= currentPage === 'repairs' ? 'active' : '' %>" href="/repairs" <%- currentPage === 'repairs' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_repairs_view"><i class="fas fa-tools" aria-hidden="true"></i><span>Repairs</span></a>
+          <a class="sidebar-link <%= currentPage === 'device-stock' ? 'active' : '' %>" href="/device-stock" <%- currentPage === 'device-stock' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_device_stock_view"><i class="fas fa-warehouse" aria-hidden="true"></i><span>Repair Centre Stock</span></a>
+          <a class="sidebar-link <%= currentPage === 'manufacturer-returns' ? 'active' : '' %>" href="/manufacturer-returns" <%- currentPage === 'manufacturer-returns' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_manufacturer_returns_view"><i class="fas fa-industry" aria-hidden="true"></i><span>Manufacturer Returns</span></a>
+          <a class="sidebar-link <%= currentPage === 'permanent-replacements' ? 'active' : '' %>" href="/permanent-replacements" <%- currentPage === 'permanent-replacements' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_replacements_view"><i class="fas fa-exchange-alt" aria-hidden="true"></i><span>Permanent Replacements</span></a>
+          <a class="sidebar-link <%= currentPage === 'temporary-loans' ? 'active' : '' %>" href="/temporary-loans" <%- currentPage === 'temporary-loans' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_temporary_loans_view"><i class="fas fa-laptop-medical" aria-hidden="true"></i><span>Temporary Loans</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_tickets_dashboard) || (authContext.data.can_sla_view) || (authContext.data.can_escalations_view) || (authContext.data.can_notifications_view) || (authContext.data.can_exceptions_view)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["ticket-dashboard", "sla-tracking", "escalations", "notifications", "exceptions"].includes(currentPage) ? 'has-active-page' : '' %>" id="mobileNavmonitoringToggle" aria-controls="mobileNavmonitoringLinks" dmx-bind:aria-expanded="mobileNavGroup.value == 'monitoring'" dmx-on:click="mobileNavGroup.setValue(mobileNavGroup.value == 'monitoring' ? '' : 'monitoring')">
+          <i class="fas fa-chart-bar" aria-hidden="true"></i><span>Monitoring & Reports</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="mobileNavmonitoringLinks" dmx-show="mobileNavGroup.value == 'monitoring'">
+          <a class="sidebar-link <%= currentPage === 'ticket-dashboard' ? 'active' : '' %>" href="/tickets/dashboard" <%- currentPage === 'ticket-dashboard' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_tickets_dashboard"><i class="fas fa-chart-bar" aria-hidden="true"></i><span>Ticket Dashboard</span></a>
+          <a class="sidebar-link <%= currentPage === 'sla-tracking' ? 'active' : '' %>" href="/sla" <%- currentPage === 'sla-tracking' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_sla_view"><i class="fas fa-stopwatch" aria-hidden="true"></i><span>SLA Tracking</span></a>
+          <a class="sidebar-link <%= currentPage === 'escalations' ? 'active' : '' %>" href="/escalations" <%- currentPage === 'escalations' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_escalations_view"><i class="fas fa-bell" aria-hidden="true"></i><span>Escalations</span></a>
+          <a class="sidebar-link <%= currentPage === 'notifications' ? 'active' : '' %>" href="/notifications" <%- currentPage === 'notifications' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_notifications_view"><i class="far fa-bell" aria-hidden="true"></i><span>Notifications</span></a>
+          <a class="sidebar-link <%= currentPage === 'exceptions' ? 'active' : '' %>" href="/exceptions" <%- currentPage === 'exceptions' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_exceptions_view"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>Exceptions</span></a>
+        </div>
+      </div>
+      <div class="sidebar-group" dmx-show="(authContext.data.can_users_view) || (authContext.data.can_security_groups_view) || (authContext.data.can_admin_access) || (authContext.data.can_logistics_locations_manage) || (authContext.data.can_spare_pools_view) || (authContext.data.can_carriers_view) || (authContext.data.can_sla_view) || (authContext.data.can_escalations_manage)">
+        <button type="button" class="sidebar-link sidebar-group-toggle <%= ["users", "security-groups", "administration", "logistics-locations", "spare-pools", "carriers", "sla", "escalation-rules"].includes(currentPage) ? 'has-active-page' : '' %>" id="mobileNavadminToggle" aria-controls="mobileNavadminLinks" dmx-bind:aria-expanded="mobileNavGroup.value == 'admin'" dmx-on:click="mobileNavGroup.setValue(mobileNavGroup.value == 'admin' ? '' : 'admin')">
+          <i class="fas fa-cog" aria-hidden="true"></i><span>Administration</span><i class="fas fa-chevron-down sidebar-chevron" aria-hidden="true"></i>
+        </button>
+        <div class="sidebar-group-links" id="mobileNavadminLinks" dmx-show="mobileNavGroup.value == 'admin'">
+<a class="sidebar-link <%= currentPage === 'users' ? 'active' : '' %>" href="/admin/users" <%- currentPage === 'users' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_users_view"><i class="fas fa-users" aria-hidden="true"></i><span>Users</span></a>
+<a class="sidebar-link <%= currentPage === 'security-groups' ? 'active' : '' %>" href="/admin/security-groups" <%- currentPage === 'security-groups' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_security_groups_view"><i class="fas fa-user-shield" aria-hidden="true"></i><span>Security Groups</span></a>
+          <a class="sidebar-link <%= currentPage === 'administration' ? 'active' : '' %>" href="/admin/organisation" <%- currentPage === 'administration' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_admin_access"><i class="fas fa-cog" aria-hidden="true"></i><span>Administration</span></a>
+          <a class="sidebar-link <%= currentPage === 'logistics-locations' ? 'active' : '' %>" href="/admin/logistics-locations" <%- currentPage === 'logistics-locations' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_logistics_locations_manage"><i class="fas fa-map-marker-alt" aria-hidden="true"></i><span>Logistics Locations</span></a>
+          <a class="sidebar-link <%= currentPage === 'spare-pools' ? 'active' : '' %>" href="/admin/spare-pools" <%- currentPage === 'spare-pools' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_spare_pools_view"><i class="fas fa-boxes" aria-hidden="true"></i><span>Spare Pools</span></a>
+          <a class="sidebar-link <%= currentPage === 'carriers' ? 'active' : '' %>" href="/admin/carriers" <%- currentPage === 'carriers' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_carriers_view"><i class="fas fa-truck" aria-hidden="true"></i><span>Carriers</span></a>
+          <a class="sidebar-link <%= currentPage === 'sla' ? 'active' : '' %>" href="/admin/sla" <%- currentPage === 'sla' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_sla_view"><i class="fas fa-stopwatch" aria-hidden="true"></i><span>SLA Management</span></a>
+          <a class="sidebar-link <%= currentPage === 'escalation-rules' ? 'active' : '' %>" href="/admin/escalations" <%- currentPage === 'escalation-rules' ? 'aria-current="page"' : '' %> dmx-show="authContext.data.can_escalations_manage"><i class="fas fa-sliders-h" aria-hidden="true"></i><span>Escalation Rules</span></a>
+        </div>
+      </div>
+    </nav>
+    <div class="sidebar-identity mt-4">
+      <img class="sidebar-brand-icon" src="/assets/img/brand/bicon.png" alt="" aria-hidden="true">
+      <h2>Laptop Warranty<br>Management Portal</h2>
+      <p>Ministry of Education</p>
+    </div>
+  </div>
+</div>

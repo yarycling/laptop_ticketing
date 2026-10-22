@@ -1,0 +1,100 @@
+<!-- Wappler include head-page="layouts/main" fontawesome_5="cdn" bootstrap5="local" is="dmx-app" id="login" appConnect="local" -->
+<meta name="ac:route" content="/login">
+
+<div class="portal-login-page">
+  <dmx-serverconnect id="setupStatus" url="/api/setup/status"></dmx-serverconnect>
+  <section class="login-hero-panel" aria-label="Portal overview">
+    <div class="login-hero-overlay"></div>
+    <img class="brand-logo brand-logo-light" src="/assets/img/brand/bmobile-logo-hero.png" alt="bmobile">
+    <div class="login-hero-content">
+      <div class="hero-accent-line"></div>
+      <h1>Welcome back</h1>
+      <p class="login-hero-title">Laptop Warranty &amp; Repair<br>Management Portal</p>
+      <p class="login-hero-meta">Ministry of Education <span></span> Powered by bmobile</p>
+      <div class="login-capability-grid">
+        <article class="login-capability-card">
+          <span class="capability-icon"><i class="fas fa-laptop" aria-hidden="true"></i></span>
+          <div><h2>Track laptops</h2><p>View inventory &amp; status</p></div>
+        </article>
+        <article class="login-capability-card">
+          <span class="capability-icon"><i class="far fa-clipboard" aria-hidden="true"></i></span>
+          <div><h2>Manage tickets</h2><p>Raise, assign &amp; follow up</p></div>
+        </article>
+        <article class="login-capability-card">
+          <span class="capability-icon"><i class="fas fa-wrench" aria-hidden="true"></i></span>
+          <div><h2>Monitor repairs</h2><p>From intake to return</p></div>
+        </article>
+        <article class="login-capability-card">
+          <span class="capability-icon"><i class="far fa-chart-bar" aria-hidden="true"></i></span>
+          <div><h2>View reports</h2><p>Get real-time insights</p></div>
+        </article>
+      </div>
+    </div>
+    <p class="login-hero-footer">SUPPORTING EDUCATION<br>THROUGH TECHNOLOGY</p>
+  </section>
+
+  <section class="login-form-panel" aria-label="Sign in">
+    <div class="login-card">
+      <div class="login-card-brand">
+        <img class="brand-logo login-card-logo" src="/assets/img/brand/bmobile-logo.png" alt="bmobile">
+      </div>
+      <h2>Sign in to your account</h2>
+      <p>Use your assigned credentials to access the portal.</p>
+      <dmx-value id="loginPasswordVisible" value=""></dmx-value>
+      <form id="loginForm" is="dmx-serverconnect-form" class="portal-form" method="post" action="/api/auth/login" dmx-on:success="portalRedirect(loginForm.data.redirect)" novalidate>
+        <% if (_('$_GET.password_reset') === 'success') { %>
+        <div class="portal-alert portal-alert-success" role="status">Password reset successful. Please sign in with your new password.</div>
+        <% } %>
+        <% if (_('$_GET.session') === 'expired') { %>
+        <div class="portal-alert portal-alert-danger" role="status">Your session has expired. Please sign in again.</div>
+        <% } %>
+        <div class="mb-3">
+          <label for="loginIdentifier" class="form-label">Email or username</label>
+          <div class="portal-input-group">
+            <span><i class="far fa-user" aria-hidden="true"></i></span>
+            <input id="loginIdentifier" name="login_identifier" type="text" class="form-control" placeholder="Enter your email or username" autocomplete="username" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="loginPassword" class="form-label">Password</label>
+          <div class="portal-input-group">
+            <span><i class="fas fa-lock" aria-hidden="true"></i></span>
+            <input id="loginPassword" name="password" type="password" class="form-control" dmx-bind:type="loginPasswordVisible.value ? 'text' : 'password'" placeholder="Enter your password" autocomplete="current-password" required>
+            <button class="btn input-icon-button" type="button" dmx-on:click="loginPasswordVisible.setValue(!loginPasswordVisible.value)" dmx-bind:aria-label="loginPasswordVisible.value ? 'Hide password' : 'Show password'" dmx-bind:aria-pressed="loginPasswordVisible.value" dmx-bind:title="loginPasswordVisible.value ? 'Hide password' : 'Show password'">
+              <i class="far fa-eye" dmx-show="!loginPasswordVisible.value" aria-hidden="true"></i>
+              <i class="fas fa-eye-slash" dmx-show="loginPasswordVisible.value" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+        <% if (_('$_GET.login_error')) { %>
+        <div class="portal-alert portal-alert-danger">
+          Invalid username/email or password.
+        </div>
+        <% } %>
+        <div class="portal-alert portal-alert-danger" dmx-show="loginForm.state.executing == false && loginForm.lastError.status == 401">
+          Invalid username/email or password.
+        </div>
+        <div class="login-options-row">
+          <div class="form-check">
+            <input id="rememberMe" name="remember" class="form-check-input" type="checkbox">
+            <label class="form-check-label" for="rememberMe">Remember me</label>
+          </div>
+          <a href="/forgot-password" aria-label="Forgot password">Forgot password?</a>
+        </div>
+        <button class="btn btn-bmobile-primary w-100" type="submit" dmx-bind:disabled="loginForm.state.executing">
+          <span dmx-show="!loginForm.state.executing">Sign In <i class="fas fa-arrow-right ms-2" aria-hidden="true"></i></span>
+          <span dmx-show="loginForm.state.executing">Signing in...</span>
+        </button>
+      </form>
+      <div class="login-divider"><span>OR</span></div>
+      <div class="login-info-note">
+        <i class="fas fa-users" aria-hidden="true"></i>
+        <p>For MOE, school administrators, ICT officers, district coordinators, and authorized repair teams.</p>
+      </div>
+    </div>
+    <div class="secure-access-note">
+      <strong><i class="fas fa-lock me-2" aria-hidden="true"></i>Secure access</strong>
+      <span>Protected portal access · Ministry of Education</span>
+    </div>
+  </section>
+</div>

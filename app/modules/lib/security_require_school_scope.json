@@ -1,0 +1,260 @@
+{
+  "exec": {
+    "steps": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_PARAM.school_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "School is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "restrict",
+        "module": "auth",
+        "action": "restrict",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "school",
+        "module": "dbconnector",
+        "action": "single",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "schools",
+            "columns": [
+              {
+                "column": "id"
+              },
+              {
+                "column": "district_id"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_PARAM.school_id}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!school.id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "School not found."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "national_scope_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_national_scopes",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "district_scope_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_district_scopes",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "district_id"
+                  },
+                  "operation": "=",
+                  "value": "{{school.district_id}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "school_scope_count",
+        "module": "dbconnector",
+        "action": "count",
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "user_school_scopes",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "user_id"
+                  },
+                  "operation": "=",
+                  "value": "{{identity}}"
+                },
+                {
+                  "data": {
+                    "column": "school_id"
+                  },
+                  "operation": "=",
+                  "value": "{{school.id}}"
+                },
+                {
+                  "data": {
+                    "column": "status"
+                  },
+                  "operation": "=",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{national_scope_count == 0 && district_scope_count == 0 && school_scope_count == 0}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "success",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "success",
+          "value": true
+        },
+        "output": true
+      },
+      {
+        "name": "scope",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "scope",
+          "value": "{{national_scope_count > 0 ? 'national' : (district_scope_count > 0 ? 'district' : 'school')}}"
+        },
+        "output": true
+      },
+      {
+        "name": "school_id",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "school_id",
+          "value": "{{school.id}}"
+        },
+        "output": true
+      }
+    ]
+  }
+}

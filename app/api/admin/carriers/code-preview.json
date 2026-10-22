@@ -1,0 +1,156 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "type": "text",
+        "name": "name"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "carriers.manage"
+          }
+        },
+        "output": true
+      },
+      {
+        "name": "carrier_name",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "carrier_name",
+          "value": "{{$_GET.name ? $_GET.name.trim() : ''}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!carrier_name}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 200,
+                  "data": {
+                    "success": true,
+                    "code": ""
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "carrier_code_base",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "carrier_code_base",
+          "value": "{{carrier_name.slugify().uppercase() || 'CARRIER'}}"
+        }
+      },
+      {
+        "name": "matching_carrier_code_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "carriers",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "carrier_code"
+                  },
+                  "operation": "=",
+                  "value": "{{carrier_code_base}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "carrier_code_suffix_count",
+        "module": "dbconnector",
+        "action": "count",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "carriers",
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "carrier_code"
+                  },
+                  "operator": "begins_with",
+                  "value": "{{carrier_code_base + '-'}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "generated_carrier_code",
+        "module": "core",
+        "action": "setvalue",
+        "options": {
+          "key": "generated_carrier_code",
+          "value": "{{matching_carrier_code_count > 0 ? carrier_code_base + '-' + (carrier_code_suffix_count + 1 < 10 ? '0' : '') + (carrier_code_suffix_count + 1) : carrier_code_base}}"
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "code": "{{generated_carrier_code}}",
+            "name": "{{carrier_name}}"
+          }
+        }
+      }
+    ],
+    "catch": {
+      "steps": [
+        {
+          "module": "core",
+          "action": "response",
+          "options": {
+            "status": 500,
+            "data": {
+              "success": false,
+              "error": "Carrier code could not be generated."
+            }
+          }
+        }
+      ]
+    }
+  }
+}

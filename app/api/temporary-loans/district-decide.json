@@ -1,0 +1,479 @@
+{
+  "meta": {
+    "$_POST": [
+      {
+        "name": "temporary_loan_case_id",
+        "type": "number"
+      },
+      {
+        "name": "decision",
+        "type": "text"
+      },
+      {
+        "name": "notes",
+        "type": "text"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "temporary_loans.authorize"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_POST.temporary_loan_case_id || $_POST.temporary_loan_case_id < 1 || ($_POST.decision != 'APPROVE' && $_POST.decision != 'REJECT') || ($_POST.notes && $_POST.notes.length > 1000) || ($_POST.decision == 'REJECT' && !$_POST.notes)}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A loan, APPROVE or REJECT decision, and a rejection reason are required; notes cannot exceed 1000 characters."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "decision_transaction",
+        "module": "dbupdater",
+        "action": "transaction",
+        "options": {
+          "connection": "db",
+          "exec": {
+            "steps": [
+              {
+                "name": "current",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "v_temporary_loan_queue",
+                    "columns": [
+                      {
+                        "column": "temporary_loan_case_id"
+                      },
+                      {
+                        "column": "ticket_id"
+                      },
+                      {
+                        "column": "origin_district_id"
+                      },
+                      {
+                        "column": "current_status_code"
+                      },
+                      {
+                        "column": "active_record_key"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "temporary_loan_case_id"
+                          },
+                          "operation": "=",
+                          "value": "{{$_POST.temporary_loan_case_id}}"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{!current.temporary_loan_case_id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_DECISION_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "district_scope",
+                "module": "dbconnector",
+                "action": "single",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "user_district_scopes",
+                    "columns": [
+                      {
+                        "column": "id"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "user_id"
+                          },
+                          "operation": "=",
+                          "value": "{{identity}}"
+                        },
+                        {
+                          "data": {
+                            "column": "district_id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.origin_district_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "status"
+                          },
+                          "operation": "=",
+                          "value": "active"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !district_scope.id}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_DECISION_SCOPE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{current.current_status_code != 'PENDING_DISTRICT_APPROVAL' || current.active_record_key != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_DECISION_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "transition",
+                "module": "dbupdater",
+                "action": "update",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_cases",
+                    "values": [
+                      {
+                        "column": "current_status_code",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'AUTHORIZED' : 'REJECTED'}}"
+                      },
+                      {
+                        "column": "authorized_by",
+                        "value": "{{$_POST.decision == 'APPROVE' ? identity : null}}"
+                      },
+                      {
+                        "column": "authorized_at",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'now'.formatDate('yyyy-MM-dd HH:mm:ss') : null}}"
+                      },
+                      {
+                        "column": "authorization_notes",
+                        "value": "{{$_POST.decision == 'APPROVE' ? ($_POST.notes || null) : null}}"
+                      },
+                      {
+                        "column": "rejected_by",
+                        "value": "{{$_POST.decision == 'REJECT' ? identity : null}}"
+                      },
+                      {
+                        "column": "rejected_at",
+                        "value": "{{$_POST.decision == 'REJECT' ? 'now'.formatDate('yyyy-MM-dd HH:mm:ss') : null}}"
+                      },
+                      {
+                        "column": "rejection_reason",
+                        "value": "{{$_POST.decision == 'REJECT' ? $_POST.notes : null}}"
+                      },
+                      {
+                        "column": "active_record_key",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 1 : null}}"
+                      },
+                      {
+                        "column": "closed_at",
+                        "value": "{{$_POST.decision == 'REJECT' ? 'now'.formatDate('yyyy-MM-dd HH:mm:ss') : null}}"
+                      }
+                    ],
+                    "wheres": {
+                      "condition": "AND",
+                      "rules": [
+                        {
+                          "data": {
+                            "column": "id"
+                          },
+                          "operation": "=",
+                          "value": "{{current.temporary_loan_case_id}}"
+                        },
+                        {
+                          "data": {
+                            "column": "current_status_code"
+                          },
+                          "operation": "=",
+                          "value": "PENDING_DISTRICT_APPROVAL"
+                        },
+                        {
+                          "data": {
+                            "column": "active_record_key"
+                          },
+                          "operation": "=",
+                          "value": 1
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{transition.affected != 1}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "error",
+                        "options": {
+                          "message": "TL_DECISION_STATE"
+                        }
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "decision_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_decisions",
+                    "values": [
+                      {
+                        "column": "temporary_loan_case_id",
+                        "value": "{{current.temporary_loan_case_id}}"
+                      },
+                      {
+                        "column": "decision_code",
+                        "value": "{{$_POST.decision}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "{{$_POST.notes || null}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "status_history",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "temporary_loan_status_history",
+                    "values": [
+                      {
+                        "column": "temporary_loan_case_id",
+                        "value": "{{current.temporary_loan_case_id}}"
+                      },
+                      {
+                        "column": "from_status_code",
+                        "value": "PENDING_DISTRICT_APPROVAL"
+                      },
+                      {
+                        "column": "to_status_code",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'AUTHORIZED' : 'REJECTED'}}"
+                      },
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "notes",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'District authorized temporary spare.' : 'District rejected temporary spare.'}}"
+                      }
+                    ]
+                  }
+                }
+              },
+              {
+                "name": "audit",
+                "module": "dbupdater",
+                "action": "insert",
+                "output": true,
+                "options": {
+                  "connection": "db",
+                  "sql": {
+                    "table": "audit_logs",
+                    "values": [
+                      {
+                        "column": "actor_user_id",
+                        "value": "{{identity}}"
+                      },
+                      {
+                        "column": "action",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'temporary_loan_authorized' : 'temporary_loan_rejected'}}"
+                      },
+                      {
+                        "column": "module",
+                        "value": "temporary_loans"
+                      },
+                      {
+                        "column": "entity_type",
+                        "value": "temporary_loan_case"
+                      },
+                      {
+                        "column": "entity_id",
+                        "value": "{{current.temporary_loan_case_id}}"
+                      },
+                      {
+                        "column": "description",
+                        "value": "{{$_POST.decision == 'APPROVE' ? 'District authorized temporary spare.' : 'District rejected temporary spare.'}}"
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 200,
+          "data": {
+            "success": true,
+            "temporary_loan_case_id": "{{$_POST.temporary_loan_case_id}}",
+            "status": "{{$_POST.decision == 'APPROVE' ? 'AUTHORIZED' : 'REJECTED'}}"
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_DECISION_SCOPE'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 403,
+                  "data": {
+                    "success": false,
+                    "error": "Forbidden."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{$_EXCEPTION.message == 'TL_DECISION_STATE' || $_EXCEPTION.code == 'ER_DUP_ENTRY'}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 409,
+                  "data": {
+                    "success": false,
+                    "error": "This temporary loan is no longer pending District approval."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "District decision could not be saved. No partial changes were committed."
+          }
+        }
+      }
+    ]
+  }
+}

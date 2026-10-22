@@ -1,0 +1,40 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "meta": { "$_GET": [{ "name": "school_id", "type": "number" }, { "name": "search", "type": "text" }, { "name": "page", "type": "number" }, { "name": "page_size", "type": "number" }] },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "tickets.create" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "module": "core", "action": "condition", "options": { "if": "{{!$_GET.school_id || $_GET.school_id < 1}}", "then": { "steps": [{ "module": "core", "action": "response", "options": { "status": 400, "data": { "success": false, "error": "Select a valid school." } } }] } } },
+    { "name": "page", "module": "core", "action": "setvalue", "options": { "key": "page", "value": "{{$_GET.page && $_GET.page > 0 ? floor($_GET.page) : 1}}" } },
+    { "name": "page_size", "module": "core", "action": "setvalue", "options": { "key": "page_size", "value": "{{!$_GET.page_size || $_GET.page_size < 1 ? 25 : ($_GET.page_size > 100 ? 100 : floor($_GET.page_size))}}" } },
+    { "name": "devices", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "devices", "alias": "dv" },
+      "columns": [{ "table": "dv", "column": "id", "alias": "device_id" }, { "table": "dv", "column": "serial_number" }, { "table": "dv", "column": "asset_tag" }, { "table": "mf", "column": "name", "alias": "manufacturer" }, { "table": "m", "column": "model_name", "alias": "model" }, { "table": "c", "column": "name", "alias": "condition" }, { "table": "ls", "column": "code", "alias": "lifecycle_code" }, { "table": "cc", "column": "current_custody_level" }, { "table": "cc", "column": "district_id" }, { "table": "d", "column": "name", "alias": "district_name" }, { "table": "cc", "column": "school_id" }, { "table": "s", "column": "name", "alias": "school_name" }, { "table": "cc", "column": "student_id" }, { "table": "st", "column": "student_reference" }, { "table": "st", "column": "first_name", "alias": "student_first_name" }, { "table": "st", "column": "last_name", "alias": "student_last_name" }],
+      "joins": [
+        { "table": "device_models", "alias": "m", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "m", "column": "id", "operation": "=", "value": { "table": "dv", "column": "device_model_id" } }] } },
+        { "table": "manufacturers", "alias": "mf", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "mf", "column": "id", "operation": "=", "value": { "table": "m", "column": "manufacturer_id" } }] } },
+        { "table": "device_conditions", "alias": "c", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "c", "column": "id", "operation": "=", "value": { "table": "dv", "column": "condition_id" } }] } },
+        { "table": "device_lifecycle_statuses", "alias": "ls", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "ls", "column": "id", "operation": "=", "value": { "table": "dv", "column": "lifecycle_status_id" } }] } },
+        { "table": "v_device_current_custody", "alias": "cc", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "cc", "column": "device_id", "operation": "=", "value": { "table": "dv", "column": "id" } }] } },
+        { "table": "schools", "alias": "s", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "s", "column": "id", "operation": "=", "value": { "table": "cc", "column": "school_id" } }] } },
+        { "table": "districts", "alias": "d", "type": "inner", "clauses": { "condition": "AND", "rules": [{ "table": "d", "column": "id", "operation": "=", "value": { "table": "cc", "column": "district_id" } }] } },
+        { "table": "students", "alias": "st", "type": "left", "clauses": { "condition": "AND", "rules": [{ "table": "st", "column": "id", "operation": "=", "value": { "table": "cc", "column": "student_id" } }] } }
+      ],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "s", "column": "id" }, "operation": "=", "value": "{{$_GET.school_id}}" },
+        { "data": { "table": "s", "column": "status" }, "operation": "=", "value": "active" },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "rules": [{ "data": { "table": "cc", "column": "current_custody_level" }, "operation": "=", "value": "SCHOOL" }, { "data": { "table": "ls", "column": "code" }, "operation": "=", "value": "AVAILABLE" }] },
+          { "condition": "AND", "rules": [{ "data": { "table": "cc", "column": "current_custody_level" }, "operation": "=", "value": "STUDENT" }, { "data": { "table": "ls", "column": "code" }, "operation": "=", "value": "ASSIGNED" }] }
+        ] },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "s", "column": "id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "cc", "column": "district_id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "cc", "column": "school_id" }, "operation": "in", "value": "{{scope_context.schools.flatten('id')}}" }] }
+        ] },
+        { "condition": "OR", "conditional": "{{$_GET.search}}", "rules": [{ "data": { "table": "dv", "column": "serial_number" }, "operator": "contains", "value": "{{$_GET.search}}" }, { "data": { "table": "dv", "column": "asset_tag" }, "operator": "contains", "value": "{{$_GET.search}}" }] }
+      ] }, "orders": [{ "table": "dv", "column": "serial_number", "direction": "asc" }], "limit": "{{page_size}}", "offset": "{{(page - 1) * page_size}}"
+    } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "devices": "{{devices}}", "page": "{{page}}", "page_size": "{{page_size}}" } } }
+  ], "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "Eligible devices could not be loaded." } } }] } }
+}

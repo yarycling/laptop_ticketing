@@ -1,0 +1,1149 @@
+{
+  "settings": {
+    "options": {
+      "method": "get",
+      "nocsrf": true
+    }
+  },
+  "meta": {
+    "$_GET": [
+      {
+        "name": "id",
+        "type": "number"
+      }
+    ]
+  },
+  "exec": {
+    "steps": [
+      {
+        "name": "permission",
+        "module": "core",
+        "action": "exec",
+        "options": {
+          "exec": "security_require_permission",
+          "params": {
+            "permission": "replacements.view"
+          }
+        }
+      },
+      {
+        "name": "identity",
+        "module": "auth",
+        "action": "identify",
+        "options": {
+          "provider": "portalSecurity"
+        }
+      },
+      {
+        "name": "scope_context",
+        "module": "core",
+        "action": "exec",
+        "output": true,
+        "options": {
+          "exec": "security_get_scope_context",
+          "params": {}
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!$_GET.id || $_GET.id < 1}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 400,
+                  "data": {
+                    "success": false,
+                    "error": "A valid replacement case ID is required."
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      {
+        "name": "case",
+        "module": "dbconnector",
+        "action": "single",
+        "output": true,
+        "options": {
+          "connection": "db",
+          "sql": {
+            "table": "v_permanent_replacement_queue",
+            "columns": [
+              {
+                "column": "replacement_case_id"
+              },
+              {
+                "column": "replacement_number"
+              },
+              {
+                "column": "exception_case_id"
+              },
+              {
+                "column": "ticket_id"
+              },
+              {
+                "column": "ticket_number"
+              },
+              {
+                "column": "logistics_case_id"
+              },
+              {
+                "column": "logistics_number"
+              },
+              {
+                "column": "logistics_status_code"
+              },
+              {
+                "column": "logistics_status_name"
+              },
+              {
+                "column": "repair_job_id"
+              },
+              {
+                "column": "original_device_id"
+              },
+              {
+                "column": "original_serial_number"
+              },
+              {
+                "column": "original_asset_tag"
+              },
+              {
+                "column": "original_manufacturer_name"
+              },
+              {
+                "column": "original_model_name"
+              },
+              {
+                "column": "replacement_source_type"
+              },
+              {
+                "column": "staged_manufacturer_unit_id"
+              },
+              {
+                "column": "staged_serial_number"
+              },
+              {
+                "column": "staged_model_description"
+              },
+              {
+                "column": "replacement_device_id"
+              },
+              {
+                "column": "replacement_serial_number"
+              },
+              {
+                "column": "replacement_asset_tag"
+              },
+              {
+                "column": "repair_service_location_id"
+              },
+              {
+                "column": "repair_centre_name"
+              },
+              {
+                "column": "origin_school_id"
+              },
+              {
+                "column": "origin_school_name"
+              },
+              {
+                "column": "origin_district_id"
+              },
+              {
+                "column": "origin_district_name"
+              },
+              {
+                "column": "replacement_status_code"
+              },
+              {
+                "column": "replacement_status_name"
+              },
+              {
+                "column": "exception_status_code"
+              },
+              {
+                "column": "ticket_status_code"
+              },
+              {
+                "column": "ticket_status_name"
+              },
+              {
+                "column": "original_device_lifecycle_code"
+              },
+              {
+                "column": "original_device_lifecycle_name"
+              },
+              {
+                "column": "phase5_custody_level"
+              },
+              {
+                "column": "phase5_district_id"
+              },
+              {
+                "column": "phase5_school_id"
+              },
+              {
+                "column": "phase5_student_id"
+              },
+              {
+                "column": "created_at"
+              },
+              {
+                "column": "updated_at"
+              },
+              {
+                "column": "completed_at"
+              },
+              {
+                "column": "temporary_loan_case_id"
+              },
+              {
+                "column": "loan_number"
+              },
+              {
+                "column": "conversion_request_number"
+              }
+            ],
+            "wheres": {
+              "condition": "AND",
+              "rules": [
+                {
+                  "data": {
+                    "column": "replacement_case_id"
+                  },
+                  "operation": "=",
+                  "value": "{{$_GET.id}}"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "module": "core",
+        "action": "condition",
+        "options": {
+          "if": "{{!case.replacement_case_id}}",
+          "then": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "response",
+                "options": {
+                  "status": 404,
+                  "data": {
+                    "success": false,
+                    "error": "Permanent replacement case was not found."
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "steps": [
+              {
+                "module": "core",
+                "action": "condition",
+                "options": {
+                  "if": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && !scope_context.districts.flatten('id').contains(case.origin_district_id) && !scope_context.service_locations.flatten('id').contains(case.repair_service_location_id)}}",
+                  "then": {
+                    "steps": [
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 403,
+                          "data": {
+                            "success": false,
+                            "error": "Forbidden."
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "else": {
+                    "steps": [
+                      {
+                        "name": "active_temporary_loan",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_temporary_loan_queue",
+                            "columns": [
+                              {
+                                "column": "temporary_loan_case_id"
+                              },
+                              {
+                                "column": "loan_number"
+                              },
+                              {
+                                "column": "current_status_code"
+                              },
+                              {
+                                "column": "selected_spare_device_id"
+                              },
+                              {
+                                "column": "selected_spare_serial_number"
+                              },
+                              {
+                                "column": "selected_spare_asset_tag"
+                              },
+                              {
+                                "column": "conversion_request_status"
+                              },
+                              {
+                                "column": "conversion_request_number"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "ticket_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.ticket_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "original_device_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.original_device_id}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "active_record_key"
+                                  },
+                                  "operation": "=",
+                                  "value": 1
+                                },
+                                {
+                                  "condition": "OR",
+                                  "rules": [
+                                    {
+                                      "data": {
+                                        "column": "current_status_code"
+                                      },
+                                      "operation": "=",
+                                      "value": "ACTIVE_LOAN"
+                                    },
+                                    {
+                                      "data": {
+                                        "column": "current_status_code"
+                                      },
+                                      "operation": "=",
+                                      "value": "CONVERSION_PENDING_HEAD_OFFICE"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "history",
+                        "module": "dbconnector",
+                        "action": "select",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": {
+                              "name": "permanent_replacement_status_history",
+                              "alias": "h"
+                            },
+                            "columns": [
+                              {
+                                "table": "h",
+                                "column": "from_status_code"
+                              },
+                              {
+                                "table": "h",
+                                "column": "to_status_code"
+                              },
+                              {
+                                "table": "h",
+                                "column": "reason"
+                              },
+                              {
+                                "table": "h",
+                                "column": "created_at"
+                              },
+                              {
+                                "table": "u",
+                                "column": "display_name",
+                                "alias": "actor_display_name"
+                              }
+                            ],
+                            "joins": [
+                              {
+                                "table": "users",
+                                "alias": "u",
+                                "type": "left",
+                                "clauses": {
+                                  "condition": "AND",
+                                  "rules": [
+                                    {
+                                      "table": "u",
+                                      "column": "id",
+                                      "operation": "=",
+                                      "value": {
+                                        "table": "h",
+                                        "column": "actor_user_id"
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "table": "h",
+                                    "column": "replacement_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.replacement_case_id}}"
+                                }
+                              ]
+                            },
+                            "orders": [
+                              {
+                                "table": "h",
+                                "column": "created_at",
+                                "direction": "desc"
+                              },
+                              {
+                                "table": "h",
+                                "column": "id",
+                                "direction": "desc"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "selection",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": {
+                              "name": "permanent_replacement_cases",
+                              "alias": "prc"
+                            },
+                            "columns": [
+                              {
+                                "table": "prc",
+                                "column": "replacement_source_type"
+                              },
+                              {
+                                "table": "prc",
+                                "column": "staged_manufacturer_unit_id"
+                              },
+                              {
+                                "table": "prc",
+                                "column": "replacement_device_id"
+                              },
+                              {
+                                "table": "prc",
+                                "column": "selected_at"
+                              },
+                              {
+                                "table": "prc",
+                                "column": "active_selection_key"
+                              },
+                              {
+                                "table": "u",
+                                "column": "display_name",
+                                "alias": "selected_by_display_name"
+                              }
+                            ],
+                            "joins": [
+                              {
+                                "table": "users",
+                                "alias": "u",
+                                "type": "left",
+                                "clauses": {
+                                  "condition": "AND",
+                                  "rules": [
+                                    {
+                                      "table": "u",
+                                      "column": "id",
+                                      "operation": "=",
+                                      "value": {
+                                        "table": "prc",
+                                        "column": "selected_by"
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "table": "prc",
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.replacement_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "staged_unit",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "manufacturer_supplied_units",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "manufacturer_id"
+                              },
+                              {
+                                "column": "resolved_model_id"
+                              },
+                              {
+                                "column": "model_description"
+                              },
+                              {
+                                "column": "manufacturer_model_reference"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.staged_manufacturer_unit_id || 0}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "staged_model_options",
+                        "module": "dbconnector",
+                        "action": "select",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "device_models",
+                            "columns": [
+                              {
+                                "column": "id"
+                              },
+                              {
+                                "column": "model_name"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "manufacturer_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{staged_unit.manufacturer_id || 0}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "status"
+                                  },
+                                  "operation": "=",
+                                  "value": "active"
+                                }
+                              ]
+                            },
+                            "orders": [
+                              {
+                                "column": "model_name",
+                                "direction": "asc"
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "allocation_transfer",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "permanent_replacement_allocation_transfers",
+                            "columns": [
+                              {
+                                "column": "allocation_level"
+                              },
+                              {
+                                "column": "district_id"
+                              },
+                              {
+                                "column": "school_id"
+                              },
+                              {
+                                "column": "student_id"
+                              },
+                              {
+                                "column": "source_stock_location_id"
+                              },
+                              {
+                                "column": "transferred_at"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "replacement_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.replacement_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "return_identity",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_logistics_return_device",
+                            "columns": [
+                              {
+                                "column": "original_device_id"
+                              },
+                              {
+                                "column": "return_device_id"
+                              },
+                              {
+                                "column": "completed_replacement_case_id"
+                              },
+                              {
+                                "column": "replacement_physical_custody_code"
+                              },
+                              {
+                                "column": "original_replacement_physical_custody_code"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "logistics_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.logistics_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "return_logistics",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_logistics_case_detail_context",
+                            "columns": [
+                              {
+                                "column": "logistics_case_id"
+                              },
+                              {
+                                "column": "logistics_number"
+                              },
+                              {
+                                "column": "current_logistics_status_name"
+                              },
+                              {
+                                "column": "current_logistics_status_code"
+                              },
+                              {
+                                "column": "ticket_current_status_code"
+                              },
+                              {
+                                "column": "returned_physical_state_code"
+                              },
+                              {
+                                "column": "allocation_school_name"
+                              },
+                              {
+                                "column": "allocation_custody_level"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "logistics_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.logistics_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "return_custody",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_logistics_physical_custody",
+                            "columns": [
+                              {
+                                "column": "device_id"
+                              },
+                              {
+                                "column": "physical_state_code"
+                              },
+                              {
+                                "column": "current_service_location_name"
+                              },
+                              {
+                                "column": "ttpost_location_name"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "logistics_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.logistics_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "conversion_loan",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "v_temporary_loan_queue",
+                            "columns": [
+                              {
+                                "column": "temporary_loan_case_id"
+                              },
+                              {
+                                "column": "loan_number"
+                              },
+                              {
+                                "column": "current_status_code"
+                              },
+                              {
+                                "column": "ticket_status_code"
+                              },
+                              {
+                                "column": "logistics_status_code"
+                              },
+                              {
+                                "column": "selected_spare_device_id"
+                              },
+                              {
+                                "column": "selected_spare_serial_number"
+                              },
+                              {
+                                "column": "selected_spare_asset_tag"
+                              },
+                              {
+                                "column": "physical_custody_code"
+                              },
+                              {
+                                "column": "custody_recorded_at"
+                              },
+                              {
+                                "column": "origin_school_name"
+                              },
+                              {
+                                "column": "origin_district_name"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "temporary_loan_case_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.temporary_loan_case_id}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "replacement_device",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": {
+                              "name": "devices",
+                              "alias": "d"
+                            },
+                            "columns": [
+                              {
+                                "table": "d",
+                                "column": "id"
+                              },
+                              {
+                                "table": "d",
+                                "column": "serial_number"
+                              },
+                              {
+                                "table": "d",
+                                "column": "asset_tag"
+                              },
+                              {
+                                "table": "l",
+                                "column": "code",
+                                "alias": "lifecycle_code"
+                              },
+                              {
+                                "table": "m",
+                                "column": "model_name"
+                              }
+                            ],
+                            "joins": [
+                              {
+                                "table": "device_lifecycle_statuses",
+                                "alias": "l",
+                                "type": "inner",
+                                "clauses": {
+                                  "condition": "AND",
+                                  "rules": [
+                                    {
+                                      "table": "l",
+                                      "column": "id",
+                                      "operation": "=",
+                                      "value": {
+                                        "table": "d",
+                                        "column": "lifecycle_status_id"
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              {
+                                "table": "device_models",
+                                "alias": "m",
+                                "type": "inner",
+                                "clauses": {
+                                  "condition": "AND",
+                                  "rules": [
+                                    {
+                                      "table": "m",
+                                      "column": "id",
+                                      "operation": "=",
+                                      "value": {
+                                        "table": "d",
+                                        "column": "device_model_id"
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "table": "d",
+                                    "column": "id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{case.replacement_device_id || 0}}"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "stock_read_permission",
+                        "module": "dbconnector",
+                        "action": "single",
+                        "output": true,
+                        "options": {
+                          "connection": "db",
+                          "sql": {
+                            "table": "user_effective_permissions",
+                            "columns": [
+                              {
+                                "column": "permission_name"
+                              }
+                            ],
+                            "wheres": {
+                              "condition": "AND",
+                              "rules": [
+                                {
+                                  "data": {
+                                    "column": "user_id"
+                                  },
+                                  "operation": "=",
+                                  "value": "{{identity}}"
+                                },
+                                {
+                                  "data": {
+                                    "column": "permission_name"
+                                  },
+                                  "operation": "=",
+                                  "value": "device_stock.view"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "name": "selected_stock",
+                        "module": "core",
+                        "action": "setvalue",
+                        "output": true,
+                        "options": {
+                          "key": "selected_stock",
+                          "value": null
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "condition",
+                        "options": {
+                          "if": "{{case.replacement_source_type == 'EXISTING_INVENTORY' && stock_read_permission.permission_name}}",
+                          "then": {
+                            "steps": [
+                              {
+                                "name": "selected_stock",
+                                "module": "dbconnector",
+                                "action": "single",
+                                "output": true,
+                                "options": {
+                                  "connection": "db",
+                                  "sql": {
+                                    "table": "v_device_stock_queue",
+                                    "columns": [
+                                      {
+                                        "column": "device_id"
+                                      },
+                                      {
+                                        "column": "serial_number"
+                                      },
+                                      {
+                                        "column": "asset_tag"
+                                      },
+                                      {
+                                        "column": "manufacturer_name"
+                                      },
+                                      {
+                                        "column": "model_name"
+                                      },
+                                      {
+                                        "column": "lifecycle_code"
+                                      },
+                                      {
+                                        "column": "allocation_level"
+                                      },
+                                      {
+                                        "column": "district_name"
+                                      },
+                                      {
+                                        "column": "school_name"
+                                      },
+                                      {
+                                        "column": "service_location_id"
+                                      },
+                                      {
+                                        "column": "service_location_name"
+                                      },
+                                      {
+                                        "column": "stock_status"
+                                      },
+                                      {
+                                        "column": "is_reserved_for_replacement"
+                                      },
+                                      {
+                                        "column": "replacement_case_id"
+                                      }
+                                    ],
+                                    "wheres": {
+                                      "condition": "AND",
+                                      "rules": [
+                                        {
+                                          "data": {
+                                            "column": "device_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{case.replacement_device_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "replacement_case_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{case.replacement_case_id}}"
+                                        },
+                                        {
+                                          "data": {
+                                            "column": "service_location_id"
+                                          },
+                                          "operation": "=",
+                                          "value": "{{case.repair_service_location_id}}"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "name": "selected_at_display",
+                        "module": "core",
+                        "action": "setvalue",
+                        "output": true,
+                        "options": {
+                          "key": "selected_at_display",
+                          "value": "{{selection.selected_at ? selection.selected_at.formatDate('MMM d, yyyy, h:mm A') : 'Not selected'}}"
+                        }
+                      },
+                      {
+                        "name": "display_history",
+                        "module": "core",
+                        "action": "repeat",
+                        "options": {
+                          "repeat": "{{history}}",
+                          "outputFilter": "exclude",
+                          "outputFields": [],
+                          "exec": {
+                            "steps": [
+                              {
+                                "name": "recorded_at_display",
+                                "module": "core",
+                                "action": "setvalue",
+                                "output": true,
+                                "options": {
+                                  "key": "recorded_at_display",
+                                  "value": "{{created_at ? created_at.formatDate('MMM d, yyyy, h:mm A') : 'Not recorded'}}"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "module": "core",
+                        "action": "response",
+                        "options": {
+                          "status": 200,
+                          "data": {
+                            "success": true,
+                            "case": "{{case}}",
+                            "selection": "{{selection}}",
+                            "staged_unit": "{{staged_unit}}",
+                            "staged_model_options": "{{staged_model_options}}",
+                            "allocation_transfer": "{{allocation_transfer}}",
+                            "return_identity": "{{case.replacement_source_type == 'TEMPORARY_LOAN_CONVERSION' ? null : return_identity}}",
+                            "return_logistics": "{{return_logistics}}",
+                            "return_custody": "{{case.replacement_source_type == 'TEMPORARY_LOAN_CONVERSION' ? null : return_custody}}",
+                            "conversion_loan": "{{case.replacement_source_type == 'TEMPORARY_LOAN_CONVERSION' ? conversion_loan : null}}",
+                            "replacement_device": "{{replacement_device}}",
+                            "selected_stock": "{{selected_stock}}",
+                            "selected_at_display": "{{selected_at_display}}",
+                            "history": "{{display_history}}",
+                            "active_temporary_loan": "{{active_temporary_loan}}"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "catch": [
+      {
+        "module": "core",
+        "action": "response",
+        "options": {
+          "status": 500,
+          "data": {
+            "success": false,
+            "error": "Permanent replacement detail could not be loaded."
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "output": true, "options": { "exec": "security_require_permission", "params": { "permission": "escalations.manage" } } }
+  ] }
+}

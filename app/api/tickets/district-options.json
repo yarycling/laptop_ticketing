@@ -1,0 +1,20 @@
+{
+  "settings": { "options": { "method": "get", "nocsrf": true } },
+  "exec": { "steps": [
+    { "name": "permission", "module": "core", "action": "exec", "options": { "exec": "security_require_permission", "params": { "permission": "tickets.view" } }, "output": true },
+    { "name": "scope_context", "module": "core", "action": "exec", "options": { "exec": "security_get_scope_context", "params": {} }, "output": true },
+    { "name": "districts", "module": "dbconnector", "action": "select", "output": true, "options": { "connection": "db", "sql": {
+      "table": { "name": "districts", "alias": "d" },
+      "columns": [{ "table": "d", "column": "id" }, { "table": "d", "column": "name" }],
+      "wheres": { "condition": "AND", "rules": [
+        { "data": { "table": "d", "column": "status" }, "operation": "=", "value": "active" },
+        { "condition": "OR", "rules": [
+          { "condition": "AND", "conditional": "{{permission.bypass == 'SUPER_ADMIN' || scope_context.has_national_scope}}", "rules": [{ "data": { "table": "d", "column": "id" }, "operation": ">", "value": 0 }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length > 0}}", "rules": [{ "data": { "table": "d", "column": "id" }, "operation": "in", "value": "{{scope_context.districts.flatten('id')}}" }] },
+          { "condition": "AND", "conditional": "{{permission.bypass != 'SUPER_ADMIN' && !scope_context.has_national_scope && scope_context.districts.length == 0 && scope_context.schools.length > 0}}", "rules": [{ "data": { "table": "d", "column": "id" }, "operation": "in", "value": "{{scope_context.schools.flatten('district_id')}}" }] }
+        ] }
+      ] }, "orders": [{ "table": "d", "column": "name", "direction": "asc" }]
+    } } },
+    { "module": "core", "action": "response", "options": { "status": 200, "data": { "success": true, "districts": "{{districts}}" } } }
+  ], "catch": { "steps": [{ "module": "core", "action": "response", "options": { "status": 500, "data": { "success": false, "error": "District options could not be loaded." } } }] } }
+}
